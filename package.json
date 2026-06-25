@@ -1,0 +1,100 @@
+{
+  "name": "mdpro",
+  "version": "1.1.1",
+  "description": "MDpro - Converted by Web2Electron",
+  "main": "main.js",
+  "author": "jhp",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.web2electron.mdpro",
+    "productName": "MDpro",
+    "copyright": "Copyright © 2026 jhp",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "web/**/*",
+      "build/installer.nsh",
+      "build/windows-uninstall.txt"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "markdown",
+          "mdown",
+          "html",
+          "htm",
+          "txt",
+          "json"
+        ],
+        "name": "Web2ElectronDocument",
+        "description": "이 앱에서 연 문서",
+        "role": "Editor"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": [
+        "ko_KR",
+        "en_US"
+      ],
+      "language": "1042",
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "include": "build/installer.nsh"
+    }
+  },
+  "dependencies": {
+    "mammoth": "^1.12.0"
+  }
+}

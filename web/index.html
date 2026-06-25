@@ -1,0 +1,1720 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MDproViewer</title>
+    <!-- Tailwind CSS for Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <!-- Marked.js for MD Rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- JSZip for backup zip -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <!-- Markdown Bold: **텍스트** 특수문자 포함 시 <b> 선변환 (marked 파싱 실패 방지) -->
+    <script src="./js/Markdown_bold.js" charset="utf-8"></script>
+    <script src="./js/md_numeric_range.js" charset="utf-8"></script>
+    <script src="./js/md_long_equals.js" charset="utf-8"></script>
+    <script src="./js/md_notebooklm_equals_hr.js" charset="utf-8"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="./css/style.css?v=20260625-3" charset="utf-8">
+    <link rel="stylesheet" href="./sidebarAI/sidebar-ai.css?v=20260603-6" charset="utf-8">
+    <link rel="stylesheet" href="./js/Scholarref/scholarref.css?v=20260402-1" charset="utf-8">
+    <link rel="stylesheet" href="./ShareSites/Share/share.css?v=20260408-2" charset="utf-8">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+    <style>
+        #settings-modal-panel {
+            position: relative;
+            resize: both;
+            overflow: hidden;
+            min-width: 360px;
+            min-height: 420px;
+            max-width: 96vw;
+            max-height: 92vh;
+        }
+        #settings-modal-resize-handle {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            width: 14px;
+            height: 14px;
+            cursor: nwse-resize;
+            opacity: 0.8;
+            user-select: none;
+            background: linear-gradient(135deg, transparent 45%, #94a3b8 46%, #94a3b8 54%, transparent 55%);
+        }
+        #settings-modal-panel.settings-modal-wide #settings-modal-body {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: 14px;
+        }
+        #settings-modal-panel.settings-modal-wide #settings-modal-body > div {
+            margin-bottom: 0 !important;
+        }
+        #settings-modal-panel.settings-modal-fullscreen {
+            position: fixed !important;
+            inset: 10px !important;
+            width: auto !important;
+            max-width: none !important;
+            height: auto !important;
+            max-height: none !important;
+            margin: 0 !important;
+            border-radius: 10px;
+        }
+        #settings-modal-panel.settings-modal-fullscreen #settings-modal-body {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: 14px;
+        }
+        #settings-modal-panel.settings-modal-fullscreen #settings-modal-resize-handle {
+            display: none;
+        }
+        @media (max-width: 900px) {
+            #settings-modal-panel.settings-modal-wide #settings-modal-body,
+            #settings-modal-panel.settings-modal-fullscreen #settings-modal-body {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col overflow-hidden transition-colors duration-200">
+
+    <!-- Top Navigation Bar (반응형: 좁은 창에서 타이틀 축소·버튼 줄바꿈) -->
+    <header
+        class="app-header bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-2 sm:px-4 md:px-6 py-2 md:py-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between lg:gap-3 z-30 no-print transition-colors shrink-0 min-w-0">
+        <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <button onclick="toggleSidebarVisibility()"
+                class="p-1.5 sm:p-2 shrink-0 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-slate-600 dark:text-slate-300"
+                title="사이드바 숨기기/보이기">
+                <i data-lucide="menu" class="w-5 h-5 sm:w-[22px] sm:h-[22px]"></i>
+            </button>
+            <div class="bg-indigo-600 p-1.5 sm:p-2 rounded-lg text-white shrink-0">
+                <i data-lucide="file-text" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+            </div>
+            <div class="min-w-0 flex-1 overflow-hidden"></div>
+        </div>
+
+        <div class="app-header-actions flex flex-wrap items-center justify-end gap-x-0.5 gap-y-1 sm:gap-x-1 sm:gap-y-1.5 w-full lg:w-auto lg:flex-nowrap lg:justify-end min-w-0">
+            <button onclick="createNewFile()"
+                class="p-1.5 sm:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors text-slate-600 dark:text-slate-300 flex items-center gap-1 shrink-0"
+                title="새 파일">
+                <i data-lucide="file-plus" class="w-[18px] h-[18px] sm:w-5 sm:h-5"></i>
+                <span class="hidden xl:inline text-sm font-medium">새파일</span>
+            </button>
+            <button onclick="document.getElementById('file-input').click()"
+                class="p-1.5 sm:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors text-slate-600 dark:text-slate-300 flex items-center gap-1 shrink-0"
+                title="파일 열기">
+                <i data-lucide="folder-open" class="w-[18px] h-[18px] sm:w-5 sm:h-5"></i>
+                <span class="hidden xl:inline text-sm font-medium">열기</span>
+            </button>
+            <input type="file" id="file-input" class="hidden" accept=".md,.txt,.csv,.html,.htm,.mpv,.mpp,.json,.zip,.mdd" onchange="handleFileSelect(event)">
+
+            <button onclick="openWorkspaceFolder()"
+                class="p-1.5 sm:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors text-slate-600 dark:text-slate-300 flex items-center gap-1 shrink-0"
+                title="작업 폴더 열기">
+                <i data-lucide="folder-open-dot" class="w-[18px] h-[18px] sm:w-5 sm:h-5"></i>
+                <span class="hidden xl:inline text-sm font-medium">폴더</span>
+            </button>
+
+            <button onclick="saveFile()"
+                class="p-1.5 sm:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors text-slate-600 dark:text-slate-300 flex items-center gap-1 shrink-0"
+                title="내보내기">
+                <i data-lucide="download" class="w-[18px] h-[18px] sm:w-5 sm:h-5"></i>
+                <span class="hidden xl:inline text-sm font-medium">내보내기</span>
+            </button>
+
+            <!-- 'DB에 저장' 버튼을 '저장'으로 변경 -->
+            <button onclick="saveToDB()"
+                class="p-1.5 sm:p-2 bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-md transition-colors flex items-center gap-1 border border-indigo-200 dark:border-indigo-800 shrink-0"
+                title="내부 저장소에 저장">
+                <i data-lucide="database" class="w-[18px] h-[18px] sm:w-5 sm:h-5"></i>
+                <span class="hidden xl:inline text-sm font-bold">저장</span>
+            </button>
+
+            <div class="hidden sm:block h-6 w-px bg-slate-200 dark:bg-slate-600 mx-1 sm:mx-2 shrink-0"></div>
+
+            <button onclick="printPage()"
+                class="p-1.5 sm:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors text-slate-600 dark:text-slate-300 shrink-0"
+                title="인쇄">
+                <i data-lucide="printer" class="w-[18px] h-[18px] sm:w-5 sm:h-5"></i>
+            </button>
+
+            <div id="header-scholar-search-wrap" class="hidden items-center gap-1 shrink-0">
+                <button type="button" id="btn-scholar-search" onclick="openScholarSearchModal()"
+                    class="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-semibold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600"
+                    title="학술검색 입력창 열기 (Alt+S)">학술검색</button>
+                <button type="button" id="btn-sites-panel" onclick="toggleSitesPanel()"
+                    class="hidden px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-semibold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600"
+                    title="Sites / Stat">Sites</button>
+                <button type="button" id="btn-template-panel" onclick="toggleTemplatePanel()"
+                    class="hidden px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-semibold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600"
+                    title="양식">양식</button>
+            </div>
+
+            <!-- AI 버튼 (인증 후 표시) -->
+            <div id="header-ai-btns" class="hidden items-center gap-1 ml-0 sm:ml-2 shrink-0 flex-wrap justify-end">
+                <button type="button" id="btn-scholar-ai" onclick="typeof openScholarAIFromHeader==='function'&&openScholarAIFromHeader()" class="px-2 py-1 sm:px-3 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600">ScholarAI</button>
+                <button type="button" id="btn-sspimg-ai" onclick="typeof openSspimgAIFromHeader==='function'&&openSspimgAIFromHeader()" class="px-2 py-1 sm:px-3 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600">sspimgAI</button>
+            </div>
+
+            <div id="google-share-toolbar-slot" class="contents"></div>
+            <div id="google-docs-toolbar-slot" class="contents"></div>
+            <button type="button" id="btn-html2ppt-panel" onclick="toggleHtml2pptPanel()"
+                class="hidden p-1.5 sm:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors text-slate-600 dark:text-slate-300 flex items-center gap-1 shrink-0 border border-slate-300 dark:border-slate-600"
+                title="GenSlide 열기">
+                <i data-lucide="presentation" class="w-[18px] h-[18px] sm:w-5 sm:h-5"></i>
+                <span class="hidden xl:inline text-sm font-medium">GenSlide</span>
+            </button>
+            <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 sm:p-1 ml-0 sm:ml-1 md:ml-2 shrink-0">
+                <button onclick="toggleMode('edit')" id="btn-edit" title="Alt+1"
+                    class="px-2.5 py-1 sm:px-4 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400">편집</button>
+                <button onclick="toggleMode('view')" id="btn-view" title="Alt+2"
+                    class="px-2.5 py-1 sm:px-4 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100">보기</button>
+                <button type="button" onclick="openPreviewPopupWindow()" id="btn-preview-popup" title="편집 프리뷰 새 창 열기"
+                    class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-md text-xs sm:text-sm font-bold transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100">[PV]</button>
+            </div>
+            <button onclick="toggleTheme()"
+                class="p-1.5 sm:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors text-slate-600 dark:text-slate-300 shrink-0"
+                title="다크/라이트 모드 전환">
+                <i data-lucide="sun" id="theme-icon-sun" class="w-[18px] h-[18px] sm:w-5 sm:h-5 hidden dark:block"></i>
+                <i data-lucide="moon" id="theme-icon-moon" class="w-[18px] h-[18px] sm:w-5 sm:h-5 block dark:hidden"></i>
+            </button>
+            <button onclick="openSettingsModal()"
+                class="p-1.5 sm:p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors text-slate-600 dark:text-slate-300 shrink-0"
+                title="설정">
+                <i data-lucide="settings" class="w-[18px] h-[18px] sm:w-5 sm:h-5"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- View-mode copy button: kept outside header to avoid header layout break -->
+    <div class="no-print fixed right-3 top-[72px] z-40">
+        <button type="button" id="btn-copy-view-rich" onclick="copyViewFormattedToClipboard()"
+            class="hidden px-2 py-1 rounded-md text-[11px] font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600 shadow-sm"
+            title="Copy formatted content from view mode">Copy</button>
+    </div>
+
+
+    <div class="flex flex-1 overflow-hidden relative">
+        <!-- Sidebar Container -->
+        <aside id="sidebar"
+            class="order-1 w-80 shrink-0 bg-slate-100 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 flex flex-col no-print z-20 relative h-full transition-colors">
+            <div id="sidebar-resize-handle" class="absolute top-0 right-0 w-1.5 h-full cursor-col-resize z-30 bg-transparent hover:bg-indigo-400/40" title="드래그하여 사이드바 너비 조절"></div>
+        </aside>
+
+        <!-- AI 우측 사이드바 (ScholarAI, sspimgAI) — 본문 오른쪽에 표시 -->
+        <div id="ai-right-sidebar-wrap" class="order-3 hidden shrink-0 relative z-10 border-l border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 overflow-visible" style="width:0;display:none">
+            <div id="ai-right-sidebar-inner" class="h-full flex flex-row items-stretch overflow-hidden min-w-0">
+            <div class="scholar-ai-sidebar" id="scholar-ai-sidebar">
+              <div class="scholar-ai-resize-handle" id="scholar-ai-resize-handle" title="드래그하여 창 너비 조절"></div>
+              <div class="scholar-ai-inner">
+                <div class="scholar-ai-header">
+                  <h3>ScholarAI</h3>
+                  <span>
+                    <button type="button" class="sa-btn" onclick="scholarAIFullscreen()" title="크게 보기">전체화면</button>
+                    <button type="button" class="sa-btn sa-popup-toggle-btn" onclick="scholarAIPopupToggle()" title="팝업창">Popup</button>
+                    <button type="button" class="sa-btn" onclick="scholarAIShrink()" title="축소">&gt;축소</button>
+                  </span>
+                </div>
+                <div class="scholar-ai-body">
+                  <div class="scholar-ai-options-row" style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                    <button type="button" class="sa-btn ghost" id="sa-pre-prompt-btn" onclick="toggleScholarAIPrePrompt()" style="font-size:11px">사전프롬프트</button>
+                    <button type="button" class="sa-btn ghost" id="sa-model-btn" onclick="toggleScholarAIModelSelect()" style="font-size:11px">모델선택</button>
+                  </div>
+                  <div id="scholar-ai-pre-prompt-panel" class="scholar-ai-collapse-panel" style="display:none;margin-bottom:8px">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px 0">
+                      <button type="button" class="sa-btn ghost" style="font-size:10px" onclick="scholarAIUsePromptRole('researcher')">Researcher</button>
+                      <button type="button" class="sa-btn ghost" style="font-size:10px" onclick="scholarAIUsePromptRole('editor')">Editor</button>
+                      <button type="button" class="sa-btn ghost" style="font-size:10px" onclick="scholarAIUsePromptRole('developer')">Developer</button>
+                    </div>
+                    <textarea id="scholar-ai-pre-prompt-text" class="scholar-ai-pre-prompt-ta" placeholder="사전 프롬프트를 입력하거나 편집하세요. 필요시 내용을 추가할 수 있습니다." style="font-size:11px;line-height:1.5;min-height:120px;max-height:400px;resize:vertical;margin:0;padding:8px;background:#1a1e28;border-radius:4px;border:1px solid #2e3447;color:#fff;width:100%;box-sizing:border-box;display:block"></textarea>
+                  </div>
+                  <div id="scholar-ai-model-panel" class="scholar-ai-collapse-panel" style="display:none;margin-bottom:8px">
+                    <label style="font-size:10px;margin-bottom:4px">모델</label>
+                    <select id="scholar-ai-model-select" class="sa-model-select" style="width:100%;padding:6px 8px;font-size:11px;border:1px solid #2e3447;border-radius:4px;background:#1a1e28;color:#b0bac8">
+                      <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                      <option value="gemini-3-flash-preview">Gemini 3 Flash</option>
+                      <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                      <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</option>
+                    </select>
+                    <label for="scholar-ai-tone-select" style="font-size:10px;margin:8px 0 4px">문체 설정</label>
+                    <select id="scholar-ai-tone-select" class="sa-model-select" style="width:100%;padding:6px 8px;font-size:11px;border:1px solid #2e3447;border-radius:4px;background:#1a1e28;color:#b0bac8">
+                      <option value="academic_ida">학술체 (-이다)</option>
+                      <option value="academic_eumham">학술체 (-음, -함)</option>
+                      <option value="general_polite">일반체 (존댓말)</option>
+                    </select>
+                  </div>
+                  <label>입력된 지문 (선택한 텍스트)</label>
+                  <div class="scholar-ai-selected-wrap" id="scholar-ai-selected-wrap">
+                    <textarea id="scholar-ai-selected" placeholder="문서에서 텍스트를 선택하면 여기에 표시됩니다. 붙여넣은 후 추가 입력 가능."></textarea>
+                    <div class="scholar-ai-selected-resize-handle" id="scholar-ai-selected-resize-handle" title="드래그하여 입력된 지문 높이 조절"></div>
+                  </div>
+                  <div class="scholar-ai-prompt-wrap" id="scholar-ai-prompt-wrap">
+                    <label>프롬프트 작성 창</label>
+                    <textarea id="scholar-ai-prompt" placeholder="선택한 지문에 대한 질문이나 지시를 입력하세요."></textarea>
+                    <div class="scholar-ai-prompt-resize-handle" id="scholar-ai-prompt-resize-handle" title="드래그하여 프롬프트창 높이 조절"></div>
+                  </div>
+                  <div class="scholar-ai-run-row">
+                    <button type="button" id="scholar-ai-run-btn" class="sa-btn" style="background:#4f8ef7;color:#fff;border:none;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:12px" onclick="scholarAIRun()">실행</button>
+                    <button type="button" id="scholar-ai-stop-btn" class="sa-btn ghost" style="padding:6px 12px;font-size:12px" onclick="scholarAIStop()" disabled>중지</button>
+                    <div id="scholar-ai-progress-wrap" class="scholar-ai-progress-wrap" aria-live="polite">
+                      <div class="scholar-ai-progress-bar">
+                        <div id="scholar-ai-progress-fill" class="scholar-ai-progress-fill"></div>
+                      </div>
+                      <span id="scholar-ai-progress-pct" class="scholar-ai-progress-pct">0%</span>
+                    </div>
+                  </div>
+                  <div class="scholar-ai-result-wrap" id="scholar-ai-result-wrap">
+                    <label>결과창</label>
+                    <textarea id="scholar-ai-result" class="scholar-ai-result" placeholder="실행 후 결과가 표시됩니다. 편집 가능합니다."></textarea>
+                    <div class="scholar-ai-result-resize-handle" id="scholar-ai-result-resize-handle" title="드래그하여 결과창 높이 조절"></div>
+                  </div>
+                </div>
+                <div class="scholar-ai-footer">
+                  <div class="scholar-ai-insert-wrap">
+                    <button type="button" class="sa-btn ghost" onclick="handleScholarAIInsertClick()">문서내 삽입</button>
+                    <div class="scholar-ai-insert-menu" id="scholar-ai-insert-menu">
+                      <button type="button" onclick="scholarAIInsertDoc(0); closeScholarAIInsertMenu()">커서위치삽입</button>
+                      <button type="button" onclick="scholarAIInsertDoc(1); closeScholarAIInsertMenu()">문서 한줄 아래에 삽입</button>
+                      <button type="button" onclick="scholarAIInsertDoc(2); closeScholarAIInsertMenu()">선택 내용 대체</button>
+                      <button type="button" onclick="scholarAIInsertDoc(3); closeScholarAIInsertMenu()">GenSlide HTMLCode 삽입</button>
+                      <button type="button" onclick="scholarAIInsertDoc(4); closeScholarAIInsertMenu()">Mermaid(ME) 삽입</button>
+                    </div>
+                  </div>
+                  <button type="button" class="sa-btn ghost" onclick="scholarAIResultZoomOpen()" title="결과를 크게 보기">🔍 결과 크게 보기</button>
+                  <span class="sa-font">font</span>
+                  <button type="button" class="sa-btn ghost" onclick="scholarAIResultFont(-1)">−</button>
+                  <button type="button" class="sa-btn ghost" onclick="scholarAIResultFont(1)">+</button>
+                  <button type="button" class="sa-btn" onclick="scholarAICopyResult()">결과복사</button>
+                  <button type="button" class="sa-btn ghost" onclick="scholarAIClearResult()" title="결과창 내용 지우기">결과창 지우기</button>
+                </div>
+                <div id="scholar-ai-result-zoom-overlay" class="scholar-ai-result-zoom-overlay" onclick="if(event.target.id==='scholar-ai-result-zoom-overlay') scholarAIResultZoomClose()">
+                  <div class="scholar-ai-result-zoom-box" onclick="event.stopPropagation()">
+                    <div class="scholar-ai-result-zoom-header">
+                      <span>인공지능 실행 결과 — 크게 보기</span>
+                      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                        <button type="button" class="sa-btn ghost" onclick="scholarAIAdjustZoom(-10)" style="font-size:12px">-</button>
+                        <span id="scholar-ai-zoom-label" style="font-size:11px;min-width:42px;text-align:center;color:#94a3b8">100%</span>
+                        <button type="button" class="sa-btn ghost" onclick="scholarAIAdjustZoom(10)" style="font-size:12px">+</button>
+                        <span style="display:inline-block;width:1px;height:16px;background:#334155;opacity:.6"></span>
+                        <button type="button" id="scholar-ai-zoom-mode-edit" class="sa-btn ghost" onclick="scholarAISetZoomMode('edit')" style="font-size:12px">편집</button>
+                        <button type="button" id="scholar-ai-zoom-mode-view" class="sa-btn ghost" onclick="scholarAISetZoomMode('view')" style="font-size:12px">보기</button>
+                        <button type="button" class="sa-btn" onclick="scholarAICopyZoomMarkdown()" style="font-size:12px">결과복사</button>
+                        <button type="button" class="sa-btn ghost" onclick="scholarAIResultZoomClose()" style="font-size:12px">닫기</button>
+                      </div>
+                    </div>
+                    <div class="scholar-ai-result-zoom-body">
+                      <textarea id="scholar-ai-result-zoom-ta" placeholder="결과가 여기에 표시됩니다." oninput="if(window.__scholarAIZoomMode==='view'){scholarAIRenderZoomMarkdown()}"></textarea>
+                      <div id="scholar-ai-result-zoom-view" class="scholar-ai-result-zoom-view hidden"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="scholar-ai-history" id="scholar-ai-history">
+                  <div class="scholar-ai-history-toolbar" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                    <button type="button" id="scholar-ai-history-toggle-btn" class="sa-btn ghost" onclick="scholarAIToggleHistoryPanel()">히스토리보기</button>
+                    <button type="button" class="sa-btn ghost" onclick="scholarAIHistorySaveAll()">히스토리 전체저장</button>
+                  </div>
+                  <div id="scholar-ai-history-panel" style="display:none;margin-top:6px">
+                    <input type="text" id="scholar-ai-history-search" placeholder="히스토리 검색..." class="scholar-ai-history-search">
+                    <div id="scholar-ai-history-list" class="scholar-ai-history-list"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- SSPAI Sidebar -->
+            <div class="ssp-ai-sidebar" id="ssp-ai-sidebar">
+              <div class="ssp-inner">
+                <div class="ssp-header">
+                  <h3>sspimgAI</h3>
+                  <div class="ssp-header-actions">
+                    <button type="button" class="sa-btn ghost ssp-fullscreen-btn" onclick="sspAIFullscreen()" title="전체화면">전체화면</button>
+                    <button type="button" class="sa-btn ghost ssp-popup-toggle-btn" onclick="sspAIPopupToggle()" title="Popup">Popup</button>
+                    <button type="button" class="sa-btn ghost" onclick="sspAIShrink()" title="닫기">닫기</button>
+                  </div>
+                </div>
+                <div class="ssp-main">
+                  <div id="ssp-upload-zone" class="ssp-upload" onclick="document.getElementById('ssp-file-input').click()" title="클릭 또는 드래그하여 업로드">
+                    이미지 업로드 (JPG, PNG, GIF, WebP)<br><small>또는 Ctrl+V 붙여넣기</small>
+                  </div>
+                  <div class="ssp-sketch-row">
+                    <button type="button" class="sa-btn ghost ssp-btn-sketch" onclick="viewerSSPOpenSketchpad()" title="스케치 그림판 열기">스케치 그림판</button>
+                  </div>
+                  <input type="file" id="ssp-file-input" accept="image/*" style="display:none">
+                  <label>프롬프트 1 (비우면 시드 이미지 기반 변형)</label>
+                  <textarea id="ssp-prompt" placeholder="예: 학술적 다이어그램 스타일로 변환"></textarea>
+                  <label>프롬프트 2 (추가 지시, 수행 시 1+2 함께 사용)</label>
+                  <textarea id="ssp-prompt-2" placeholder="예: 배경은 흰색, 선명한 선으로"></textarea>
+                  <label>이미지 생성 모델</label>
+                  <select id="ssp-model">
+                    <option value="gemini-3.1-flash-image-preview">Nano Banana 2</option>
+                    <option value="gemini-2.5-flash-image">Nano Banana</option>
+                    <option value="gemini-3-pro-image-preview">Nano Banana Pro</option>
+                    <option value="imagen-4.0-generate-001">Imagen 4</option>
+                  </select>
+                  <label>이미지 비율</label>
+                  <div class="ssp-ratio-wrap">
+                    <button type="button" class="ssp-ratio-btn active" data-ratio="1:1">1:1</button>
+                    <button type="button" class="ssp-ratio-btn" data-ratio="16:9">16:9</button>
+                    <button type="button" class="ssp-ratio-btn" data-ratio="9:16">9:16</button>
+                    <button type="button" class="ssp-ratio-btn" data-ratio="4:3">4:3</button>
+                    <button type="button" class="ssp-ratio-btn" data-ratio="3:4">3:4</button>
+                  </div>
+                  <label class="block text-[10px] text-slate-500 dark:text-slate-400 mb-1">기본: 학술·논문용 도표 스타일</label>
+                  <label><input type="checkbox" id="ssp-no-text"> 단순 이미지 (텍스트·자막 없음)</label>
+                  <div class="ssp-action-row">
+                    <button type="button" class="sa-btn ssp-btn-generate" onclick="viewerSSPGenerate()">🎨 AI 재생성</button>
+                    <button type="button" class="sa-btn ghost ssp-btn-internal-insert" onclick="viewerSSPSaveInternalAndInsert('markdown')" title="결과 이미지를 문서 내부에 저장하고 삽입">문서삽입</button>
+                    <button type="button" class="sa-btn ghost ssp-btn-crop" onclick="viewerSSPCropFromPanel()" title="현재 결과 이미지 자르기">Crop</button>
+                    <button type="button" class="sa-btn ssp-btn-imgbb" onclick="viewerSSPOpenImgbb()" title="imgBB에서 이미지 업로드 후 링크 발급">imgBB</button>
+                  </div>
+                  <label class="ssp-img-link-label">이미지 URL → 마크다운 삽입 (편집 모드)</label>
+                  <div class="ssp-img-link-row">
+                    <input type="url" id="ssp-image-link-url" class="ssp-image-link-input" placeholder="https://i.ibb.co/… (imgBB 등)" inputmode="url">
+                    <button type="button" class="sa-btn ghost ssp-btn-insert-md" onclick="sspInsertImageMarkdown()">삽입</button>
+                  </div>
+                  <div id="ssp-progress-wrap" class="ssp-progress-wrap">
+                    <div class="ssp-progress-bar">
+                      <div id="ssp-progress-fill" class="ssp-progress-fill"></div>
+                    </div>
+                    <div class="ssp-progress-row">
+                      <span id="ssp-progress-pct" style="font-size:10px;color:#94a3b8">0%</span>
+                      <button type="button" class="sa-btn ghost" style="font-size:10px" onclick="viewerSSPAbort()">⏹ 생성중지</button>
+                    </div>
+                  </div>
+                  <div id="ssp-status" class="ssp-status"></div>
+                  <img id="ssp-result-img" class="ssp-result" style="display:none" alt="생성 결과" title="생성 결과 미리보기">
+                  <button type="button" class="sa-btn ghost ssp-btn-open-result" style="margin-top:8px" onclick="viewerSSPOpenCurrentResultFullscreen()" disabled>크게보기</button>
+                  <button type="button" class="sa-btn ghost" style="margin-top:8px" onclick="viewerSSPDownload()" id="ssp-download-btn" disabled>다운로드 저장</button>
+                </div>
+                <div class="ssp-img-history" style="margin-top:12px;border-top:1px solid #2e3447;padding-top:8px">
+                  <label style="font-size:10px;color:#94a3b8;display:block;margin-bottom:6px">이미지 생성 히스토리</label>
+                  <div id="ssp-img-history-list" class="ssp-img-history-list"></div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- SSP Fullscreen Overlay -->
+            <div id="viewer-fs-overlay" class="viewer-fs-overlay" onclick="if(event.target.id==='viewer-fs-overlay'||event.target.id==='viewer-fs-area') viewerSSPCloseFullscreen()">
+              <div class="viewer-fs-toolbar" onclick="event.stopPropagation()">
+                <button type="button" onclick="viewerSSPFsZoom(-0.25)" title="축소">−</button>
+                <span id="viewer-fs-zoom-val" style="min-width:40px;text-align:center;font-size:12px">100%</span>
+                <button type="button" onclick="viewerSSPFsZoom(0.25)" title="확대">+</button>
+                <button type="button" onclick="viewerSSPFsDownload()" title="다운로드">⬇ 다운로드</button>
+                <button type="button" class="viewer-fs-internal-insert-btn" onclick="viewerSSPFsSaveInternalAndInsert()" title="문서 내부에 저장하고 삽입">문서삽입</button>
+                <button type="button" class="viewer-fs-insert-btn" onclick="viewerSSPFsInsert()" title="문서에 삽입">문서에 삽입</button>
+                <button type="button" class="viewer-fs-apply-btn" onclick="viewerSSPFsApplyToSSP()" title="sspimgAI 입력란에 적용">적용</button>
+                <button type="button" onclick="viewerSSPFsCrop()" title="자르기">✂ 자르기</button>
+                <button type="button" onclick="viewerSSPCloseFullscreen()" title="닫기">닫기</button>
+              </div>
+              <div class="viewer-fs-area" id="viewer-fs-area">
+                <div class="viewer-fs-wrap" id="viewer-fs-wrap"><img id="viewer-fs-img" alt=""/></div>
+              </div>
+            </div>
+            </div>
+        </div>
+
+        <div class="order-2 flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
+            <!-- Sub Toolbar (편집 시 편집 도구 가운데) -->
+            <div id="toolbar"
+                class="bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-2 sm:px-4 md:px-6 py-1.5 sm:py-2 flex flex-wrap items-center justify-center gap-1.5 sm:gap-3 md:gap-4 no-print transition-colors">
+                <!-- Edit Toolbar: 가운데 정렬 -->
+                <div id="edit-tools" class="flex flex-wrap items-center justify-center gap-2">
+                    <div class="h-4 w-px bg-slate-300 dark:bg-slate-600 mx-2"></div>
+                    <button onclick="insertAtCursor('bold')"
+                        class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"
+                        title="굵게">B</button>
+                    <button onclick="insertAtCursor('italic')"
+                        class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm italic"
+                        title="기울임꼴">I</button>
+
+                    <button onclick="applyHeading(1)"
+                        class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"
+                        title="제목 1 (H1)">H1</button>
+                    <button onclick="applyHeading(2)"
+                        class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"
+                        title="제목 2 (H2)">H2</button>
+                    <button onclick="applyHeading(3)"
+                        class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"
+                        title="제목 3 (H3)">H3</button>
+                    <button type="button" onclick="insertListAtSelection('bullet')"
+                        class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"
+                        title="항목 목록 (Alt+5)">[-list]</button>
+                    <button type="button" onclick="insertListAtSelection('number')"
+                        class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"
+                        title="번호 목록 (Alt+6)">[1.list]</button>
+                    <button type="button" onclick="insertAtCursor('code')"
+                        class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm uppercase"
+                        title="코드 블록 삽입 (Alt+C)">C</button>
+                    <div class="relative inline-flex items-center gap-1">
+                        <button type="button" id="btn-mermaid-quick" onclick="toggleMermaidQuickMenu()"
+                            class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm uppercase"
+                            title="Mermaid options">[MERMAID]</button>
+                        <div id="mermaid-quick-panel"
+                            class="hidden absolute z-[70] top-[calc(100%+6px)] left-0 w-[180px] p-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-xl">
+                            <div class="grid grid-cols-1 gap-2">
+                                <button type="button" onclick="insertAtCursor('mermaid'); closeMermaidQuickMenu()"
+                                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">코드입력</button>
+                                <button type="button" onclick="openMermaidEditorModal(); closeMermaidQuickMenu()"
+                                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">ME</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="insertAtCursor('quote')"
+                        class="p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm text-slate-600 dark:text-slate-300"
+                        title="인용구"><i data-lucide="quote" class="w-3.5 h-3.5"></i></button>
+                    <div class="relative inline-flex items-center">
+                        <button type="button" id="btn-table-insert-picker" onclick="toggleTableInsertPicker()"
+                            class="p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm text-slate-600 dark:text-slate-300"
+                            title="표 삽입"><i data-lucide="table" class="w-3.5 h-3.5"></i></button>
+                        <div id="table-insert-picker"
+                            class="hidden absolute z-[70] top-[calc(100%+6px)] left-0 w-[320px] p-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-xl">
+                            <div id="table-insert-size-label" class="text-[11px] font-semibold text-slate-700 dark:text-slate-200 mb-2">표 삽입</div>
+                            <div id="table-insert-grid" class="grid grid-cols-10 gap-1"></div>
+                            <button type="button" onclick="toggleCaptionInsertPanel('table', true)"
+                                class="mt-2 w-full px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">표 캡션 넣기</button>
+                            <div id="table-caption-panel" class="caption-inline-panel hidden mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">표 캡션 삽입</h3>
+                                    <button type="button" onclick="toggleCaptionInsertPanel('table', false)"
+                                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-[11px] text-slate-600 dark:text-slate-300">닫기</button>
+                                </div>
+                                <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-2">형식 선택</div>
+                                <div id="table-caption-format-buttons" class="flex flex-wrap gap-1.5 mb-3"></div>
+                                <div class="grid grid-cols-[48px_1fr] gap-2 mb-3">
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">번호</label>
+                                        <input type="number" id="table-caption-number-input" value="1" min="1"
+                                            class="w-full px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">설명 / 제목</label>
+                                        <input type="text" id="table-caption-text-input" placeholder="내용을 입력하세요"
+                                            class="w-full px-2 py-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100">
+                                    </div>
+                                </div>
+                                <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">미리보기</div>
+                                <div id="table-caption-preview" class="px-2 py-1.5 min-h-[34px] rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100 mb-3"></div>
+                                <div class="flex justify-end gap-2">
+                                    <button type="button" onclick="toggleCaptionInsertPanel('table', false)"
+                                        class="px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300">취소</button>
+                                    <button type="button" onclick="confirmCaptionInsert('table')"
+                                        class="px-3 py-1.5 rounded bg-indigo-600 text-xs font-semibold text-white hover:bg-indigo-700">삽입</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="convertSelectionPatternToTable()"
+                        class="px-1.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm text-[11px] leading-none font-semibold text-slate-600 dark:text-slate-300"
+                        title="선택 영역 규칙 패턴 표 변환 (Alt+7)">[->T]</button>
+
+                    <button onclick="openLinkModal('link')"
+                        class="p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm text-slate-600 dark:text-slate-300"
+                        title="링크"><i data-lucide="link" class="w-3.5 h-3.5"></i></button>
+                    <button id="btn-image-link" onclick="openLinkModal('image')"
+                        class="p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm text-slate-600 dark:text-slate-300"
+                        title="이미지"><i data-lucide="image" class="w-3.5 h-3.5"></i></button>
+                    <button type="button" id="btn-image-insert" onclick="openImageInsertModal()"
+                        class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm uppercase"
+                        title="이미지 삽입 패널">[img]</button>
+                    <button id="btn-image-upload-tool" type="button" onclick="openImageUploadTool()"
+                        class="hidden px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm uppercase"
+                        title="이미지 업로드 도구 열기">imgUp</button>
+                    <div id="macro-toolbar-wrap" class="relative inline-flex items-center gap-1 hidden">
+                        <button type="button" id="btn-macro-run" onclick="runCheckedMacroActions()"
+                            class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm uppercase"
+                            title="체크된 매크로 실행">Macro >></button>
+                        <button type="button" id="btn-macro-menu" onclick="toggleMacroMenu()"
+                            class="px-1.5 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"
+                            title="매크로 설정">▼</button>
+                        <div id="macro-menu-panel"
+                            class="hidden fixed z-[80] p-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-xl w-[min(620px,94vw)]">
+                            <div id="macro-menu-header" class="flex items-center gap-1.5 mb-2 cursor-move select-none">
+                                <button type="button" id="btn-macro-record" onclick="toggleMacroRecord(true)"
+                                    class="px-2 py-1 rounded border border-emerald-400 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold hover:bg-emerald-50 dark:hover:bg-emerald-900/20">record</button>
+                                <button type="button" id="btn-macro-end" onclick="toggleMacroRecord(false)"
+                                    class="px-2 py-1 rounded border border-amber-400 text-amber-700 dark:text-amber-300 text-[11px] font-semibold hover:bg-amber-50 dark:hover:bg-amber-900/20">end</button>
+                                <button type="button" onclick="clearMacroEntries()"
+                                    class="px-2 py-1 rounded border border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-300 text-[11px] font-semibold hover:bg-rose-50 dark:hover:bg-rose-900/20">clear</button>
+                                <span id="macro-record-status" class="ml-1 text-[11px] text-slate-500 dark:text-slate-400">idle</span>
+                                <div class="ml-auto flex items-center gap-1">
+                                    <button type="button" onclick="dockMacroMenuRight()"
+                                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">우측이동</button>
+                                    <button type="button" onclick="toggleMacroMenu()"
+                                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">닫기</button>
+                                </div>
+                            </div>
+                            <div class="border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden">
+                                <div class="grid grid-cols-[30px_80px_1fr_170px_56px] gap-1 px-2 py-1.5 bg-slate-100 dark:bg-slate-800 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                                    <div class="text-center">v</div>
+                                    <div>id</div>
+                                    <div>기능</div>
+                                    <div>단축키 등록</div>
+                                    <div class="text-center">실행</div>
+                                </div>
+                                <div id="macro-list-body" class="max-h-56 overflow-auto"></div>
+                            </div>
+                            <div id="macro-menu-resize-handle" class="absolute right-0 bottom-0 w-3 h-3 cursor-se-resize bg-indigo-500/70 rounded-tl"></div>
+                        </div>
+                    </div>
+                    <div class="relative inline-flex items-center gap-1">
+                        <button type="button" id="btn-math-quick" onclick="toggleMathQuickMenu()"
+                            class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm uppercase"
+                            title="수식 빠른 입력">MATH</button>
+                        <div id="math-quick-panel"
+                            class="hidden absolute z-[70] top-[calc(100%+6px)] left-0 w-[min(320px,92vw)] p-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-xl">
+                            <div class="grid grid-cols-2 gap-2">
+                                <button type="button" onclick="insertInlineMathTemplate()"
+                                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">인라인 수식</button>
+                                <button type="button" onclick="insertDisplayMathTemplate()"
+                                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">줄 수식 $$</button>
+                                <button type="button" onclick="insertMathRefTemplate()"
+                                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">mathRef</button>
+                                <button type="button" onclick="openMath99Popup()"
+                                    class="px-2 py-1 rounded border border-indigo-300 dark:border-indigo-600 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20">Math99</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="relative inline-flex items-center gap-1">
+                        <button type="button" id="btn-tidy-quick" onclick="toggleTidyQuickMenu()"
+                            class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm uppercase"
+                            title="Tidy options">Tidy</button>
+                        <div id="tidy-quick-panel"
+                            class="hidden absolute z-[70] top-[calc(100%+6px)] left-0 w-[180px] p-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-xl">
+                            <div class="grid grid-cols-1 gap-2">
+                                <button type="button" onclick="applyEnterTidyInEditor()"
+                                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">엔터정리</button>
+                                <button type="button" onclick="applyMathTidyInEditor()"
+                                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">수식정리</button>
+                                <button type="button" onclick="convertSelectionMarkdownToHtml(); closeTidyQuickMenu && closeTidyQuickMenu()"
+                                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">MD2HTML</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="openFindReplace()"
+                        class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm uppercase"
+                        title="Find and replace">FIND</button>
+                    <div class="relative inline-flex items-center gap-1">
+                        <button type="button" id="btn-footnote-quick" onclick="toggleFootnoteQuickMenu()"
+                            class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"
+                            title="각주 메뉴">[^1]</button>
+                        <div id="footnote-quick-panel"
+                            class="hidden absolute z-[70] top-[calc(100%+6px)] left-0 w-[220px] p-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-xl">
+                            <div class="grid grid-cols-1 gap-2">
+                                <button type="button" onclick="insertFootnoteTemplate()"
+                                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">각주 삽입</button>
+                                <button type="button" onclick="renumberAllFootnotes()"
+                                    class="px-2 py-1 rounded border border-indigo-300 dark:border-indigo-600 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20">전체 각주번호 재정렬</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="openLinkModal('id')"
+                        class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"
+                        title="ID 앵커 삽입">ID</button>
+                    <button type="button" onclick="insertUserInfoAtCursor()"
+                        class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-[10px] font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm"
+                        title="커서 위치에 저장된 사용자 정보 삽입 (Shift+Alt+A)">userIn</button>
+                    <div class="h-4 w-px bg-slate-300 dark:bg-slate-600 mx-2"></div>
+                    <button type="button" id="btn-editor-light" onclick="toggleEditorLightMode()"
+                        class="p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm text-slate-600 dark:text-slate-300 flex items-center justify-center"
+                        title="편집창 라이트/다크 전환">
+                        <i data-lucide="sun" id="editor-light-icon-sun" class="w-3.5 h-3.5 hidden"></i>
+                        <i data-lucide="moon" id="editor-light-icon-moon" class="w-3.5 h-3.5"></i>
+                    </button>
+                    <button type="button" id="btn-mini-pv" onclick="toggleMiniPreview()"
+                        class="p-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm text-slate-600 dark:text-slate-300 flex items-center gap-1"
+                        title="편집 중 미니 미리보기">
+                        <i data-lucide="panel-right-open" class="w-3.5 h-3.5"></i>
+                        <span class="text-[10px] sm:text-xs font-medium max-[380px]:hidden sm:inline">miniPV</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Find & Replace Toolbar -->
+            <div id="find-replace-bar"
+                class="hidden bg-indigo-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-2 flex flex-wrap items-center gap-3 text-sm no-print transition-colors">
+                <span class="font-bold text-slate-600 dark:text-slate-300">찾기</span>
+                <input type="text" id="find-input" placeholder="검색어..."
+                    class="px-3 py-1.5 border border-indigo-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48 shadow-sm">
+                <span class="font-bold text-slate-600 dark:text-slate-300 ml-2">바꾸기</span>
+                <button type="button" onclick="swapFindReplaceValues()"
+                    class="px-2 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-slate-600 font-medium text-slate-700 dark:text-slate-200 shadow-sm transition-colors"
+                    title="찾기/바꾸기 값 전환">⇄</button>
+                <input type="text" id="replace-input" placeholder="바꿀 내용..."
+                    class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48 shadow-sm">
+                <div class="h-4 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                <button onclick="findNext()"
+                    class="px-3 py-1.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-slate-600 font-medium text-slate-700 dark:text-slate-200 shadow-sm transition-colors">다음</button>
+                <button onclick="findPrev()"
+                    class="px-3 py-1.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-slate-600 font-medium text-slate-700 dark:text-slate-200 shadow-sm transition-colors">이전</button>
+                <button onclick="replaceCurrent()"
+                    class="px-3 py-1.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-slate-600 font-medium text-slate-700 dark:text-slate-200 shadow-sm transition-colors">바꾸기</button>
+                <button onclick="replaceAll()"
+                    class="px-3 py-1.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-100 dark:hover:bg-slate-600 font-medium text-slate-700 dark:text-slate-200 shadow-sm transition-colors">모두</button>
+                <div class="h-4 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                <div class="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
+                    <label class="inline-flex items-center gap-1.5 select-none">
+                        <input type="checkbox" id="particle-auto-correct" checked
+                            class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                        <span>자동 조사</span>
+                    </label>
+                    <div class="inline-flex items-center gap-2">
+                        <span class="font-semibold">찾을 방향</span>
+                        <label class="inline-flex items-center gap-1 select-none">
+                            <input type="radio" name="find-direction" value="down" checked
+                                class="text-indigo-600 focus:ring-indigo-500">
+                            <span>아래</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1 select-none">
+                            <input type="radio" name="find-direction" value="up"
+                                class="text-indigo-600 focus:ring-indigo-500">
+                            <span>위</span>
+                        </label>
+                        <label class="inline-flex items-center gap-1 select-none">
+                            <input type="radio" name="find-direction" value="all"
+                                class="text-indigo-600 focus:ring-indigo-500">
+                            <span>전체</span>
+                        </label>
+                    </div>
+                </div>
+                <button onclick="closeFindReplace()"
+                    class="ml-auto p-1.5 text-slate-400 hover:text-red-500 dark:hover:text-red-400 bg-white dark:bg-slate-700 hover:bg-slate-100 rounded-full border border-slate-200 dark:border-slate-600 shadow-sm transition-colors"><i
+                        data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+
+            <!-- Main Content Area -->
+            <main id="drop-zone" class="flex-1 overflow-hidden relative">
+                <div id="viewer-container"
+                    class="hidden h-full w-full overflow-y-auto custom-scrollbar px-8 sm:px-12 md:px-16 pt-3 sm:pt-4 md:pt-5 pb-8 sm:pb-12 md:pb-16 flex justify-center bg-white dark:bg-slate-950 transition-all duration-300">
+                    <div id="viewer" class="markdown-body w-full max-w-4xl print-area mx-auto">
+                        <div
+                            class="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500">
+                            <i data-lucide="file-up" class="w-16 h-16 mb-4 opacity-20"></i>
+                            <p class="text-lg">파일을 드래그하거나 열기 버튼을 클릭하세요</p>
+                        </div>
+                    </div>
+                </div>
+
+
+                
+                
+                <div id="content-viewport" class="relative h-full w-full flex justify-center bg-slate-900 dark:bg-slate-950 px-8 sm:px-12 md:px-16 pt-3 sm:pt-4 md:pt-5 pb-8 sm:pb-12 md:pb-16 viewer-edit-active">
+                    
+                                    
+                    <div id="editor-doc-wrap" class="w-full max-w-4xl h-full mx-auto flex flex-col">
+                        <textarea id="viewer-edit-ta" spellcheck="false"
+                        class="w-full max-w-4xl h-full bg-transparent text-slate-200 focus:outline-none custom-scrollbar text-lg leading-relaxed placeholder-slate-500 resize-none mx-auto"
+                        placeholder="이곳에 마크다운 내용을 입력하세요..."></textarea>
+                    </div>
+                    <div id="mini-preview-host"></div>
+                    <div id="editor-shift-float" class="no-print absolute left-2 bottom-2 z-30 flex items-center gap-1 px-2 py-1 rounded-md border border-slate-300 dark:border-slate-600 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm shadow">
+                        <button type="button" onclick="adjustEditorHorizontalShift(-20)"
+                            class="px-2 py-0.5 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                            title="편집창을 왼쪽으로 이동">L</button>
+                        <button type="button" onclick="resetEditorHorizontalShift()"
+                            class="px-2 py-0.5 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                            title="이동 초기화">0</button>
+                        <button type="button" onclick="adjustEditorHorizontalShift(20)"
+                            class="px-2 py-0.5 rounded border border-slate-300 dark:border-slate-600 text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                            title="편집창을 오른쪽으로 이동">R</button>
+                    </div>
+                </div>
+                <div class="scroll-jump-rail no-print" aria-label="문서 빠른 이동">
+                    <button type="button" class="scroll-jump-btn" onclick="scrollToDocumentTop()" title="맨 위로 이동">맨위</button>
+                    <button type="button" class="scroll-jump-btn" onclick="scrollToDocumentBottom()" title="맨 아래로 이동">맨아래</button>
+                </div>
+            </main>
+            <div class="no-print border-t border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 px-3 sm:px-4 md:px-6 py-1.5">
+                <div class="flex items-center gap-2 text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 min-w-0">
+                    <span class="shrink-0 font-semibold">MDproViewer</span>
+                    <span class="shrink-0 text-slate-300 dark:text-slate-600">|</span>
+                    <p id="file-name-display" class="truncate min-w-0 flex-1">새 문서: 문서명이 표시됩니다.</p>
+                    <div id="footer-zoom-font" class="shrink-0 flex items-center gap-1 sm:gap-2 pl-2 border-l border-slate-200 dark:border-slate-700">
+                        <span class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">헤더</span>
+                        <div class="flex items-center gap-0.5">
+                            <button type="button" onclick="adjustHeaderScale(-0.05)" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300" title="헤더 축소"><i data-lucide="minus" class="w-3.5 h-3.5"></i></button>
+                            <span id="header-scale-display" class="text-[11px] font-mono w-9 text-center text-slate-600 dark:text-slate-300">100%</span>
+                            <button type="button" onclick="adjustHeaderScale(0.05)" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300" title="헤더 확대"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">화면</span>
+                        <div class="flex items-center gap-0.5">
+                            <button type="button" onclick="adjustPageScale(-0.1)" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300" title="화면 축소"><i data-lucide="minus" class="w-3.5 h-3.5"></i></button>
+                            <span id="scale-display" class="text-[11px] font-mono w-9 text-center text-slate-600 dark:text-slate-300">100%</span>
+                            <button type="button" onclick="adjustPageScale(0.1)" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300" title="화면 확대"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                        <span class="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider ml-1">폰트</span>
+                        <div class="flex items-center gap-0.5">
+                            <button type="button" onclick="adjustFontSize(-2)" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300" title="폰트 축소"><i data-lucide="type" class="w-3.5 h-3.5 scale-75"></i></button>
+                            <span id="font-size-display" class="text-[11px] font-mono w-9 text-center text-slate-600 dark:text-slate-300">16px</span>
+                            <button type="button" onclick="adjustFontSize(2)" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-600 dark:text-slate-300" title="폰트 확대"><i data-lucide="type" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="math99-popup" class="fixed inset-0 z-[72] hidden no-print pointer-events-none">
+        <div id="math99-popup-panel"
+            class="pointer-events-auto absolute top-20 right-4 w-[min(980px,92vw)] h-[min(720px,82vh)] min-w-[360px] min-h-[260px] bg-white dark:bg-slate-900 rounded-lg border border-slate-300 dark:border-slate-600 shadow-2xl overflow-hidden">
+            <div id="math99-popup-header"
+                class="h-9 px-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-between cursor-move select-none">
+                <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Math99</span>
+                <button type="button" onclick="closeMath99Popup()"
+                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">닫기</button>
+            </div>
+            <iframe id="math99-popup-frame" src="https://www.processon.io/ko/visual" loading="lazy"
+                class="w-full h-[calc(100%-36px)] border-0 bg-white"></iframe>
+            <div id="math99-popup-resize-handle" class="absolute right-0 bottom-0 w-3 h-3 cursor-se-resize bg-indigo-500/70 rounded-tl"></div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Link/Image Modal -->
+    <div id="input-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 no-print">
+        <div id="input-modal-panel"
+            class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4 animate-in fade-in zoom-in duration-200">
+            <div id="input-modal-header" class="flex items-center justify-between gap-2 mb-4 cursor-move select-none">
+                <h3 id="modal-title" class="text-lg font-bold text-slate-800 dark:text-slate-100">링크 삽입</h3>
+                <div id="image-link-shortcuts" class="hidden items-center gap-1">
+                    <button type="button" onclick="openImageInsertExternalLink('google')"
+                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300"
+                        title="구글 이미지 검색 열기">구글이미지</button>
+                    <button type="button" onclick="openImageInsertExternalLink('imgbb')"
+                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300"
+                        title="imgBB 이미지 저장소 열기">이미지저장소</button>
+                    <button type="button" onclick="closeModal()"
+                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300"
+                        title="이미지 삽입 창 닫기">닫기</button>
+                </div>
+            </div>
+            <div id="input-modal-body" class="space-y-4">
+                <div>
+                    <label id="label-text"
+                        class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">표시
+                        텍스트</label>
+                    <input type="text" id="input-display-text"
+                        class="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+                </div>
+                <div id="input-url-wrap">
+                    <label id="label-url"
+                        class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">URL
+                        주소</label>
+                    <input type="text" id="input-url"
+                        class="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+                </div>
+            </div>
+            <div class="flex gap-2 mt-6">
+                <button onclick="closeModal()"
+                    class="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">취소</button>
+                <button onclick="confirmModalInsert()"
+                    class="flex-1 px-4 py-2 bg-indigo-600 rounded-md text-sm font-medium text-white hover:bg-indigo-700 transition-colors">삽입하기</button>
+            </div>
+            <div id="input-modal-image-panel-footer" class="hidden mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+                <button type="button" id="input-modal-image-panel-toggle" onclick="toggleInputModalImagePanel()"
+                    class="w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">이미지 업로드 창 열기</button>
+            </div>
+            <div id="input-modal-resize-handle" title="Resize"></div>
+        </div>
+    </div>
+
+    <!-- Move to Folder Modal -->
+    <div id="move-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 no-print">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4">문서 이동</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">이동할 대상 폴더를 선택하세요.</p>
+            <div id="folder-choice-list"
+                class="max-h-60 overflow-y-auto space-y-1 mb-6 border border-slate-100 dark:border-slate-600 rounded-lg p-2">
+                <!-- Folders listed here -->
+            </div>
+            <div class="flex gap-2">
+                <button onclick="closeMoveModal()"
+                    class="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mermaid Editor Modal -->
+    <div id="mermaid-editor-modal" class="fixed inset-0 hidden z-[70] no-print pointer-events-none">
+        <div id="mermaid-editor-modal-panel"
+            class="pointer-events-auto absolute top-16 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-[min(1200px,96vw)] h-[min(860px,92vh)] flex flex-col border border-slate-200 dark:border-slate-700 overflow-hidden"
+            style="resize: both; min-width: 760px; min-height: 520px; max-width: 98vw; max-height: 95vh;">
+            <div id="mermaid-editor-modal-header" class="px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-between cursor-move select-none">
+                <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">Mermaid Editor</h3>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="mermaid-editor-dock-right-btn" onclick="toggleMermaidEditorDockRight()"
+                        class="px-2.5 py-1.5 border border-slate-300 dark:border-slate-600 rounded-md text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="우측으로 보내기">>></button>
+                    <button type="button" onclick="toggleMermaidEditorFullscreen()"
+                        class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-md text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">전체화면</button>
+                    <button type="button" onclick="closeMermaidEditorModal()"
+                        class="px-3 py-1.5 border border-slate-300 dark:border-slate-600 rounded-md text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">닫기</button>
+                </div>
+            </div>
+            <iframe id="mermaid-editor-frame" src="./js/mermaid/mermaid-editor/index.html"
+                class="w-full h-full border-0 bg-white dark:bg-slate-900" title="Mermaid Editor"></iframe>
+        </div>
+    </div>
+
+    <!-- Backup Modal (내문서 백업) -->
+    <div id="backup-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 no-print">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2 flex items-center gap-2">
+                <i data-lucide="archive" class="w-5 h-5"></i> 내문서 백업
+            </h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">저장된 문서를 한 번에 내려받습니다.</p>
+            <div class="flex flex-col gap-2">
+                <button onclick="exportZip()" class="w-full px-4 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2 transition-colors">
+                    <i data-lucide="file-archive" class="w-4 h-4"></i> ZIP 저장 (모든 문서 다운로드)
+                </button>
+                <button onclick="exportMpv()" class="w-full px-4 py-3 bg-indigo-100 dark:bg-indigo-900/40 hover:bg-indigo-200 dark:hover:bg-indigo-900/60 rounded-lg text-sm font-medium text-indigo-700 dark:text-indigo-200 flex items-center justify-center gap-2 transition-colors">
+                    <i data-lucide="file-json" class="w-4 h-4"></i> MPV 저장 (.mpv / .json 호환)
+                </button>
+            </div>
+            <div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-600">
+                <button onclick="closeBackupModal(); document.getElementById('file-input').click()"
+                    class="w-full mb-2 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center justify-center gap-2">
+                    <i data-lucide="folder-open" class="w-4 h-4"></i> MVP 열기
+                </button>
+                <button onclick="closeBackupModal()" class="w-full px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Modal -->
+    <div id="save-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 no-print">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4">문서 저장</h3>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">저장할 제목을
+                    입력하세요</label>
+                <input type="text" id="save-title-input"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();confirmSaveModal();}"
+                    class="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:outline-none text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+            </div>
+            <div class="flex gap-2 mt-6">
+                <button type="button" onclick="closeSaveModal()"
+                    class="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">취소</button>
+                <button type="button" onclick="setTimeout(confirmSaveModal,0)"
+                    class="flex-1 px-4 py-2 bg-indigo-600 rounded-md text-sm font-medium text-white hover:bg-indigo-700">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirm Modal -->
+    <div id="delete-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 no-print">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 text-center">
+            <div
+                class="w-16 h-16 bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="alert-circle" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">문서를 삭제할까요?</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">지우면 복구가 불가능합니다.</p>
+            <div class="flex gap-2">
+                <button onclick="closeDeleteModal()"
+                    class="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">취소</button>
+                <button onclick="confirmDeleteModal()"
+                    class="flex-1 px-4 py-2 bg-red-600 rounded-md text-sm font-medium text-white hover:bg-red-700">삭제하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recovery Prompt Modal -->
+    <div id="recovery-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 no-print">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4 text-center">
+            <div
+                class="w-16 h-16 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">복구 가능한 작업이 있습니다</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">마지막으로 편집하던 내용을 복구할까요?</p>
+            <div class="flex flex-col gap-2">
+                <div class="flex gap-2">
+                    <button type="button" onclick="dismissRecovery()"
+                        class="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">아니오</button>
+                    <button type="button" onclick="applyRecovery()"
+                        class="flex-1 px-4 py-2 bg-indigo-600 rounded-md text-sm font-medium text-white hover:bg-indigo-700">복구하기</button>
+                </div>
+                <button type="button" onclick="pasteFromClipboardAndDismiss()"
+                    class="w-full px-4 py-2 border border-emerald-200 dark:border-emerald-700 rounded-md text-sm font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30">새로 입력하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast"
+        class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 dark:bg-slate-700 text-white px-4 py-2 rounded-full shadow-lg text-sm opacity-0 transition-opacity pointer-events-none z-50">
+        알림 메시지
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed top-10 inset-x-0 hidden z-[2147483645] no-print flex justify-center">
+        <div id="settings-modal-panel"
+            class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 w-[min(92vw,420px)] max-h-[90vh] flex flex-col">
+            <h3 id="settings-modal-header" class="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2 shrink-0 select-none">
+                <i data-lucide="settings" class="w-5 h-5"></i> 환경 설정
+                <div class="ml-auto flex items-center gap-2">
+                    <button id="settings-modal-drag-handle" type="button" onclick="toggleSettingsModalCompact()"
+                        class="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300"
+                        title="우측 축소/복원">축소</button>
+                    <button id="settings-modal-fullscreen-btn" type="button" onclick="toggleSettingsModalFullscreen()"
+                        class="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                        title="전체화면 전환">전체화면</button>
+                    <button type="button" onclick="closeSettingsModal()"
+                        class="px-2 py-1 text-xs rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                        title="설정 닫기">닫기</button>
+                </div>
+            </h3>
+
+            <div id="settings-modal-body" class="space-y-4 mb-6 overflow-y-auto custom-scrollbar flex-1 pr-2">
+                <!-- Code Block Color Setting -->
+                <div
+                    class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50">
+                    <h4
+                        class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">
+                        코드창 (Code Block) 색상</h4>
+
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="text-sm font-semibold text-slate-600 dark:text-slate-400">배경 색상</label>
+                        <input type="color" id="code-bg-color" oninput="applyCodeColorSettings()" value="#1e293b"
+                            class="w-10 h-10 p-0.5 rounded cursor-pointer border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800">
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <label class="text-sm font-semibold text-slate-600 dark:text-slate-400">텍스트 색상</label>
+                        <input type="color" id="code-text-color" oninput="applyCodeColorSettings()" value="#f8fafc"
+                            class="w-10 h-10 p-0.5 rounded cursor-pointer border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800">
+                    </div>
+
+                    <div class="mt-4 flex justify-end">
+                        <button onclick="resetCodeColorSettings()"
+                            class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 underline-offset-2 hover:underline">
+                            기본값으로 초기화
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Shortcuts Information -->
+                <div
+                    class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50">
+                    <div class="flex items-center justify-between mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">
+                        <h4 class="text-sm font-bold text-slate-700 dark:text-slate-300">단축키 안내</h4>
+                        <button type="button" id="settings-shortcuts-toggle-btn" onclick="toggleSettingsShortcutsFold()"
+                            class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                            title="단축키 안내 접기/펼치기">접기</button>
+                    </div>
+                    <div id="settings-shortcuts-body" class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">편집 모드 전환</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Alt</kbd> + <kbd>1</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">보기 모드 전환</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Alt</kbd> + <kbd>2</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">다크/라이트 모드 전환</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Alt</kbd> + <kbd>4</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">학술검색 열기</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Alt</kbd> + <kbd>S</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">제목(H1) 적용</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>1</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">제목(H2) 적용</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>2</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">제목(H3) 적용</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>3</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">제목(H4) 적용</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>4</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">제목(H5) 적용</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>5</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">항목 목록(-) 적용</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Alt</kbd> + <kbd>5</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">번호 목록(1.) 적용</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Alt</kbd> + <kbd>6</kbd>
+                            </span>
+                        </div>
+                        <!-- Settings Modal Content Continued -->
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">찾기/바꾸기 열기</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>H</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">Tidy 정리</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>T</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">각주 삽입</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>E</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">MD2HTML 변환</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>H</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">&lt;br&gt; 삽입</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Enter</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">페이지 구분 삽입</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>Enter</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">&amp;nbsp; 삽입</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Space</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">줄 위아래로 이동</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Alt</kbd> + <kbd>↑</kbd> <kbd>↓</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">줄 아래로 복사</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Shift</kbd> + <kbd>Alt</kbd> + <kbd>↓</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">실행 취소 (Undo)</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>Z</kbd>
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-600 dark:text-slate-400">다시 실행 (Redo)</span>
+                            <span
+                                class="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm font-sans flex items-center gap-1">
+                                <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="mt-3 p-2 rounded border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/40">
+                        <p class="text-[11px] leading-5 text-slate-600 dark:text-slate-400">
+                            TRT 적용 방침: 렌더링 시에는 표시만 보정(원문 유지), Tidy 실행 시에는 원문에 전처리 결과를 반영합니다.
+                        </p>
+                    </div>
+                    <div class="mt-3 p-2 rounded border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-900/40">
+                        <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                            <input type="checkbox" id="enter-button-insert-br" onchange="toggleEnterButtonInsertBrSetting(this.checked)"
+                                class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                            <span>툴바 Enter 버튼을 <code>&lt;br&gt;</code>로 삽입</span>
+                        </label>
+                        <label class="mt-2 inline-flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                            <input type="checkbox" id="selection-wrap-enabled" onchange="toggleSelectionWrapSetting(this.checked)"
+                                class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500" checked>
+                            <span>Selection wrap rules (<code>[]</code>, <code>&lt;&gt;</code>, <code>()</code>, <code>{}</code>, <code>&quot;&quot;</code>, <code>''</code>, <code>`inline`</code>, <code>```block```</code>, <code>$inline$</code> -&gt; <code>$$block$$</code>)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- AI API Key Settings (단축키 안내 아래) -->
+                <div
+                    class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50">
+                    <h4
+                        class="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">
+                        AI 연동 설정</h4>
+                    <div class="space-y-3">
+                        <div id="ai-link-settings-block">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-1">AI Studio API Key</label>
+                            <input type="password" id="ai-api-key" placeholder="API 키를 입력하세요..." autocomplete="off"
+                                oninput="validateApiKeyInputUI()"
+                                class="ai-api-key-input w-full px-3 py-1.5 border rounded-md focus:outline-none text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 transition-colors">
+                            <p id="ai-api-key-feedback" class="text-xs mt-1 min-h-[1.25rem]" aria-live="polite"></p>
+                        </div>
+                        <div class="flex items-center justify-end gap-2">
+                            <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener noreferrer"
+                                class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">
+                                API 키 발급
+                            </a>
+                            <button onclick="saveApiKey()"
+                                class="px-3 py-1.5 bg-indigo-600 rounded-md text-xs font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm">
+                                API 키 저장
+                            </button>
+                        </div>
+                        <div class="pt-1">
+                            <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                                <input type="checkbox" id="sqlite-enabled"
+                                    class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                                <span>Sqlite 사용</span>
+                            </label>
+                        </div>
+                        </div>
+
+                        <div id="github-settings-slot"></div>
+
+                        <!-- 사용자 정보 (인공지능 사용과 무관, 항상 표시) -->
+                        <div class="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                            <p class="text-xs font-semibold text-slate-600 dark:text-slate-400">사용자 정보 · 인증번호 요청 메일</p>
+                            <p class="text-[11px] text-slate-500 dark:text-slate-500">편집창 userIn / Shift+Alt+A 삽입에도 사용됩니다.</p>
+                            <div class="bg-slate-100 dark:bg-slate-800/80 rounded p-3 space-y-2">
+                                <input type="text" id="ai-user-name" placeholder="이름" class="w-full px-2 py-1 text-xs border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-900">
+                                <input type="text" id="ai-user-id" placeholder="학번" class="w-full px-2 py-1 text-xs border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-900">
+                                <input type="text" id="ai-user-major" placeholder="전공" class="w-full px-2 py-1 text-xs border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-900">
+                                <input type="text" id="ai-user-contact" placeholder="연락처" class="w-full px-2 py-1 text-xs border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-900">
+                                <input type="email" id="ai-user-email" placeholder="이메일" autocomplete="email" class="w-full px-2 py-1 text-xs border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-900">
+                                <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                                    <input type="checkbox" id="ai-user-prefix-set" checked
+                                        class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                                    <span>[ v ] prefix set</span>
+                                </label>
+                                <div class="flex flex-col sm:flex-row gap-2">
+                                    <button type="button" onclick="saveAiUserInfo()"
+                                        class="flex-1 px-2 py-1.5 border border-indigo-300 dark:border-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-200 rounded text-xs font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/50">
+                                        사용자 정보 저장
+                                    </button>
+                                    <button type="button" onclick="sendAuthRequestMail()"
+                                        class="flex-1 px-2 py-1.5 bg-slate-600 dark:bg-slate-700 text-white rounded text-xs font-medium hover:bg-slate-700 dark:hover:bg-slate-600">
+                                        인증번호 요청 메일 보내기
+                                    </button>
+                                </div>
+                                <p id="ai-user-info-feedback" class="text-xs min-h-[1rem] text-slate-500 dark:text-slate-400" aria-live="polite"></p>
+                            </div>
+                        </div>
+
+                        <!-- 인공지능 사용: 비번 + ScholarAI/sspimgAI -->
+                        <div class="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                            <div class="flex items-center justify-between gap-2" role="group" aria-label="인공지능 사용">
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" id="ai-use-checkbox" onclick="setTimeout(toggleAiPasswordSection,0)"
+                                        class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                                    <label for="ai-use-checkbox" class="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer select-none">인공지능 사용</label>
+                                </div>
+                                <button type="button" id="ai-use-fold-btn" onclick="toggleAiUseFold()"
+                                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                                    title="인공지능 사용 설정 접기/펼치기">접기</button>
+                            </div>
+                            <div id="ai-password-section" class="hidden space-y-3 pl-6">
+                                <p class="text-xs text-amber-600 dark:text-amber-400">박중희 교수님에게 인증번호를 받으세요.</p>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <input type="password" id="ai-password-input" placeholder="인증번호 입력"
+                                        class="flex-1 min-w-[120px] px-3 py-1.5 border rounded-md text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 transition-colors border-slate-200 dark:border-slate-600">
+                                    <button type="button" onclick="saveAiPassword()"
+                                        class="px-3 py-1.5 bg-indigo-600 rounded-md text-xs font-medium text-white hover:bg-indigo-700">저장</button>
+                                </div>
+                                <p id="ai-password-feedback" class="text-xs min-h-[1.25rem]" aria-live="polite"></p>
+                                <p id="ai-scholar-sspimg-hint" class="text-xs text-amber-600 dark:text-amber-400"></p>
+                                <div class="space-y-2 pt-2">
+                                    <label class="flex items-center gap-2 cursor-pointer ai-scholar-sspimg-label select-none">
+                                        <input type="checkbox" id="ai-scholar-enabled" onclick="setTimeout(onAiFeatureCheckboxChange,0)"
+                                            class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                                        <span class="text-sm text-slate-700 dark:text-slate-300">ScholarAI</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer ai-scholar-sspimg-label select-none">
+                                        <input type="checkbox" id="ai-sspimg-enabled" onclick="setTimeout(onAiFeatureCheckboxChange,0)"
+                                            class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                                        <span class="text-sm text-slate-700 dark:text-slate-300">sspimgAI</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                                <label class="flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" id="scholar-search-visible" onclick="setTimeout(toggleScholarSearchSection,0)"
+                                        class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-sm font-medium text-slate-700 dark:text-slate-300">학술검색 보이기</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" id="highlight-visible" onclick="setTimeout(toggleHighlightSection,0)"
+                                        class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Highlight 보이기</span>
+                                </label>
+                                <div id="google-share-settings-slot" class="space-y-2"></div>
+                                <div id="sites-settings-slot"></div>
+                                <label class="flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" id="macro-visible" onclick="setTimeout(toggleMacroVisibilitySection,0)"
+                                        class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-sm font-medium text-slate-700 dark:text-slate-300">MACRO기능 보이기</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" id="template-visible" onclick="setTimeout(toggleTemplateSection,0)"
+                                        class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-sm font-medium text-slate-700 dark:text-slate-300">양식보이기</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" id="html2ppt-visible" onclick="setTimeout(toggleHtml2pptSection,0)"
+                                        class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-sm font-medium text-slate-700 dark:text-slate-300">GenSlide 보이기</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer select-none">
+                                    <input type="checkbox" id="image-upload-enabled" onclick="setTimeout(toggleImageUploadSection,0)"
+                                        class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-sm font-medium text-slate-700 dark:text-slate-300">이미지 업로드 사용</span>
+                                </label>
+                                <div id="image-upload-settings" class="pl-6 space-y-2">
+                                    <label for="ai-imgbb-api-key" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">imgBB API Key</label>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <input type="password" id="ai-imgbb-api-key" placeholder="imgBB API key"
+                                            autocomplete="off"
+                                            class="flex-1 min-w-[160px] px-3 py-1.5 border rounded-md text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-200 dark:border-slate-600">
+                                        <button type="button" onclick="saveImgbbApiKeyFromModal()"
+                                            class="px-3 py-1.5 bg-indigo-600 rounded-md text-xs font-medium text-white hover:bg-indigo-700">저장</button>
+                                    </div>
+                                    <a href="https://api.imgbb.com/" target="_blank" rel="noopener noreferrer"
+                                        class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">API key 받기: https://api.imgbb.com/</a>
+                                    <p id="ai-imgbb-feedback" class="text-xs min-h-[1rem] text-slate-500 dark:text-slate-400" aria-live="polite"></p>
+                                </div>
+                                <div id="google-docs-settings-slot" class="pl-6"></div>
+                                <div id="ai-integration-settings-slot"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-2">
+                <button type="button" id="btn-open-indb-status" onclick="openInDbStatusModal()"
+                    class="px-4 py-2 border-2 border-slate-700 rounded-md text-sm font-medium text-slate-800 bg-white hover:bg-slate-50">
+                    inDB보기
+                </button>
+                <button type="button" onclick="exportSettingsMset()"
+                    class="px-3 py-2 border border-slate-500 rounded-md text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50">
+                    set_Export
+                </button>
+                <button type="button" onclick="triggerImportSettingsMset()"
+                    class="px-3 py-2 border border-slate-500 rounded-md text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50">
+                    set_import
+                </button>
+                <input type="file" id="settings-import-file" accept=".mset,application/json,.json" class="hidden"
+                    onchange="importSettingsMsetFile(event)">
+                <button type="button" onclick="closeSettingsModal()"
+                    class="flex-1 px-4 py-2 bg-indigo-600 rounded-md text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm">
+                    닫기
+                </button>
+            </div>
+            <div id="settings-modal-resize-handle" title="Resize"></div>
+        </div>
+    </div>
+
+    <!-- inDB Status Modal -->
+    <div id="indb-status-modal" class="fixed inset-0 bg-black/30 hidden items-center justify-center z-[2147483646] no-print" onclick="if(event.target===this) closeInDbStatusModal()">
+        <div class="w-[min(680px,92vw)] h-[min(680px,86vh)] bg-white dark:bg-slate-900 border-2 border-slate-800 shadow-2xl flex flex-col">
+            <div class="px-4 py-2 bg-indigo-600 text-white text-2xl text-center tracking-wide">inDB Status</div>
+            <div id="indb-status-list" class="flex-1 overflow-auto p-4 space-y-3 bg-slate-100 dark:bg-slate-800"></div>
+            <div class="border-t-2 border-slate-700 p-2 flex items-center justify-center gap-2 bg-white dark:bg-slate-900">
+                <button type="button" onclick="deleteAllInDbStatusItems()"
+                    class="px-4 py-1.5 bg-red-600 text-white font-bold rounded hover:bg-red-700">전체지우기</button>
+                <button type="button" onclick="closeInDbStatusModal()"
+                    class="px-4 py-1.5 border border-slate-400 rounded text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="scholar-search-slot"></div>
+
+    <!-- Highlight Popup -->
+    <div id="highlight-popup-modal" class="fixed inset-0 bg-transparent hidden items-start justify-start z-50 no-print pointer-events-none">
+        <div id="highlight-popup-panel"
+            class="pointer-events-auto mt-20 ml-5 bg-white/95 dark:bg-slate-800/95 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 backdrop-blur-[1px] w-[min(980px,92vw)] h-[78vh] min-h-[420px] min-w-[360px] flex flex-col overflow-hidden resize">
+            <div id="highlight-popup-header" class="flex items-center justify-between px-3 py-2 border-b border-slate-200 dark:border-slate-700 cursor-move select-none">
+                <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">Highlight</h3>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" id="highlight-popup-open-btn" onclick="openHighlightFile()"
+                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">Open</button>
+                    <button type="button" id="highlight-popup-save-btn" onclick="exportHighlightData()"
+                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">Save</button>
+                    <button type="button" id="highlight-popup-data-btn" onclick="openHighlightDataWindow()"
+                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">Data</button>
+                    <button type="button" id="highlight-popup-shrink-btn" onclick="toggleHighlightPopupShrink()"
+                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">[>>]</button>
+                    <button type="button" id="highlight-popup-dock-btn" onclick="toggleHighlightPopupDockRight()"
+                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">Undock</button>
+                    <button type="button" id="highlight-popup-close-btn" onclick="closeHighlightPopup()"
+                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">Close</button>
+                </div>
+            </div>
+            <div id="highlight-popup-body" class="flex-1 min-h-0">
+                <iframe id="highlight-popup-frame" src="./HighLights/Highlghts_index.html" onload="window.handleHighlightFrameLoad && window.handleHighlightFrameLoad()"
+                    class="w-full h-full border-0 bg-white dark:bg-slate-900" title="Highlight"></iframe>
+            </div>
+        </div>
+    </div>
+    <!-- Text Style Modal (Alt+L) -->
+    <div id="text-style-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50 no-print">
+        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-5 w-full max-w-xl mx-4 border border-slate-200 dark:border-slate-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">서식 설정 <span class="text-xs font-medium text-slate-500">ALT+L</span></h3>
+                <button type="button" onclick="closeTextStyleModal()" class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500">✕</button>
+            </div>
+            <div class="space-y-3 text-sm">
+                <div class="flex items-center gap-3">
+                    <label class="w-20 text-slate-700 dark:text-slate-200">글자 크기</label>
+                    <input type="checkbox" id="style-enable-font-size" class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                    <select id="style-font-size" class="px-2 py-1 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900">
+                        <option value="12px">12pt</option>
+                        <option value="14px">14pt</option>
+                        <option value="16px">16pt</option>
+                        <option value="18px">18pt</option>
+                        <option value="20px">20pt</option>
+                        <option value="24px">24pt</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="w-20 text-slate-700 dark:text-slate-200">글자 색</label>
+                    <input type="checkbox" id="style-enable-text-color" class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                    <input type="color" id="style-text-color" value="#ff3b3b" class="w-10 h-8 p-0.5 border border-slate-300 dark:border-slate-600 rounded">
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="w-20 text-slate-700 dark:text-slate-200">형광펜</label>
+                    <input type="checkbox" id="style-enable-highlight" class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                    <input type="color" id="style-highlight-color" value="#fff176" class="w-10 h-8 p-0.5 border border-slate-300 dark:border-slate-600 rounded">
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="w-20 text-slate-700 dark:text-slate-200">볼드</label>
+                    <input type="checkbox" id="style-enable-bold" class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                    <span class="px-2 py-1 border border-slate-300 dark:border-slate-600 rounded font-bold">B</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="w-20 text-slate-700 dark:text-slate-200">이탤릭</label>
+                    <input type="checkbox" id="style-enable-italic" class="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500">
+                    <span class="px-2 py-1 border border-slate-300 dark:border-slate-600 rounded italic">I</span>
+                </div>
+            </div>
+            <div class="mt-5 flex justify-end gap-2">
+                <button type="button" onclick="closeTextStyleModal()" class="px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200">취소</button>
+                <button type="button" onclick="applyTextStyleToSelection()" class="px-3 py-1.5 rounded bg-indigo-600 text-white hover:bg-indigo-700">적용</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Insert Modal -->
+    <div id="image-insert-modal" class="fixed inset-0 bg-transparent hidden items-center justify-center z-50 no-print">
+        <div id="image-insert-panel" class="bg-slate-100 dark:bg-slate-800 rounded-lg shadow-2xl border border-slate-300 dark:border-slate-600 w-full max-w-2xl mx-4 p-6 relative">
+            <div id="image-insert-header" class="flex items-center justify-between mb-4 cursor-move select-none">
+                <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">이미지 삽입</h3>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="toggleImageInsertDockRight()" class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-bold" title="우측 축소/복원">≫</button>
+                    <button type="button" onclick="closeImageInsertModal()" class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300">닫기</button>
+                </div>
+            </div>
+            <input type="file" id="img-insert-file" accept="image/*" class="hidden" onchange="handleImageInsertFile(event)">
+
+            <div class="grid grid-cols-2 gap-0 rounded-xl border border-slate-200/80 dark:border-slate-600/80 bg-slate-100/70 dark:bg-slate-800/70 mb-4 overflow-hidden">
+                <button type="button" id="img-insert-upload-zone"
+                    onclick="document.getElementById('img-insert-file').click()"
+                    ondragover="onImageInsertUploadDragOver(event)"
+                    ondragleave="onImageInsertUploadDragLeave(event)"
+                    ondrop="onImageInsertUploadDrop(event)"
+                    class="h-32 border-2 border-dashed border-slate-300/70 dark:border-slate-500/70 border-r border-r-slate-200/70 dark:border-r-slate-600/70 rounded-none flex flex-col items-center justify-center gap-1 text-indigo-600/85 dark:text-indigo-300/85 bg-slate-50/45 dark:bg-slate-700/20 transition-colors">
+                    <i data-lucide="image-up" class="w-5 h-5 opacity-90"></i>
+                    <div class="text-sm sm:text-base font-bold tracking-tight leading-tight">이미지 업로드</div>
+                    <div class="text-[10px] font-medium text-slate-500/80 dark:text-slate-300/80">JPG, PNG, GIF, WebP</div>
+                    <div class="text-[10px] font-medium text-slate-500/80 dark:text-slate-300/80">드래그 앤 드롭</div>
+                </button>
+                <button type="button" id="img-insert-paste-zone" onclick="focusImageInsertPasteZone()"
+                    class="h-32 border-2 border-dashed border-slate-300/70 dark:border-slate-500/70 rounded-none flex flex-col items-center justify-center gap-1 text-slate-600/85 dark:text-slate-300/85 bg-slate-50/45 dark:bg-slate-700/20">
+                    <i data-lucide="clipboard" class="w-5 h-5 text-amber-500/90"></i>
+                    <div class="text-sm sm:text-base font-bold tracking-tight leading-tight">이 공간 클릭 후</div>
+                    <div class="text-sm sm:text-base font-bold tracking-tight leading-tight"><span class="px-1 py-0.5 rounded bg-slate-200/70 dark:bg-slate-600/70">Ctrl+V</span> 로 이미지 붙여넣기</div>
+                </button>
+            </div>
+
+            <div class="flex items-center gap-2 mb-3 flex-wrap">
+                <button type="button" id="img-insert-sketch-pad-btn" onclick="if(window.AiSketchPad&&typeof window.AiSketchPad.open==='function') window.AiSketchPad.open('insert')"
+                    class="px-3 py-1.5 bg-indigo-600 text-white font-bold rounded border border-indigo-800 text-sm">스케치그림판</button>
+                <button type="button" id="img-insert-crop-btn" onclick="cropImageInsertCurrent()"
+                    class="px-3 py-1.5 bg-sky-600 text-white font-bold rounded border border-sky-800 text-sm">Crop</button>
+                <button type="button" onclick="uploadImageInsertToImgbb()"
+                    class="px-3 py-1.5 bg-teal-600 text-white font-bold rounded border border-teal-700 text-sm">[imgBB] Upload</button>
+                <button type="button" onclick="saveImageInsertToInternalDb()"
+                    class="px-3 py-1.5 bg-sky-700 text-white font-bold rounded border border-sky-900 text-sm">문서내부저장</button>
+                <button type="button" onclick="toggleImageInsertGallery()" id="img-insert-gallery-toggle"
+                    class="px-3 py-1.5 bg-fuchsia-700 text-white font-bold rounded border border-fuchsia-900 text-sm">Gallery</button>
+            </div>
+
+            <div class="bg-slate-200/70 dark:bg-slate-700/70 p-3 rounded">
+                <div class="text-sm font-semibold text-slate-500 dark:text-slate-300 mb-2">Image URL -> Insert (Markdown / HTML)</div>
+                <input type="url" id="img-insert-url" placeholder="https://i.ibb.co/... (imgBB dir)"
+                    class="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 mb-2">
+                <div class="flex items-center gap-8 px-1">
+                    <button type="button" onclick="insertImageFromModal('markdown')" class="text-sm font-semibold text-slate-700 dark:text-slate-200">Markdown</button>
+                    <button type="button" onclick="insertImageFromModal('html')" class="text-sm font-semibold text-slate-700 dark:text-slate-200">HTML</button>
+                </div>
+            </div>
+
+                        <div id="img-insert-gallery-panel" class="hidden mt-3 p-2 rounded border border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-900/40">
+                <div class="flex items-center justify-between mb-2 gap-2">
+                    <div class="text-xs font-semibold text-slate-600 dark:text-slate-300">IndexedDB 이미지 갤러리</div>
+                    <div class="flex items-center gap-1">
+                        <button type="button" onclick="downloadImageInsertGalleryZip()" class="px-2 py-1 text-[11px] rounded border border-emerald-400 text-emerald-700 dark:text-emerald-300">ZIP 전체다운로드</button>
+                        <button type="button" onclick="refreshImageInsertGallery()" class="px-2 py-1 text-[11px] rounded border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300">새로고침</button>
+                    </div>
+                </div>
+                <div id="img-insert-gallery-list" class="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-44 overflow-auto pr-1"></div>
+            </div>
+
+            <div class="mt-3 text-xs text-slate-500 dark:text-slate-400" id="img-insert-status"></div>
+            <img id="img-insert-preview" class="mt-3 max-h-40 rounded border border-slate-300 dark:border-slate-600 hidden" alt="preview">
+
+            <div id="figure-caption-panel" class="caption-inline-panel mt-4 pt-4 border-t border-slate-300 dark:border-slate-600">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">그림 캡션 삽입</h3>
+                    <button type="button" onclick="toggleCaptionInsertPanel('figure', false)"
+                        class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300">닫기</button>
+                </div>
+                <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">형식 선택</div>
+                <div id="figure-caption-format-buttons" class="flex flex-wrap gap-2 mb-3"></div>
+                <div class="grid grid-cols-[64px_1fr] gap-3 mb-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">번호</label>
+                        <input type="number" id="figure-caption-number-input" value="1" min="1"
+                            class="w-full px-2 py-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1">설명 / 제목</label>
+                        <input type="text" id="figure-caption-text-input" placeholder="내용을 입력하세요"
+                            class="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100">
+                    </div>
+                </div>
+                <div class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">미리보기</div>
+                <div id="figure-caption-preview" class="px-3 py-2 min-h-[38px] rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-slate-100 mb-4"></div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="toggleCaptionInsertPanel('figure', false)"
+                        class="px-4 py-2 rounded border border-slate-300 dark:border-slate-600 text-sm text-slate-600 dark:text-slate-300">취소</button>
+                    <button type="button" onclick="confirmCaptionInsert('figure')"
+                        class="px-4 py-2 rounded bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-700">삽입</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="sites-panel-slot" class="contents"></div>
+
+    <div id="template-panel" class="fixed bottom-3 right-3 hidden flex-col z-50 no-print w-[min(640px,96vw)] rounded-lg border border-slate-300 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 shadow-2xl backdrop-blur-sm">
+        <div id="template-panel-header" class="flex items-center justify-between px-3 py-2 border-b border-slate-200 dark:border-slate-700 cursor-move select-none">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">양식</h3>
+            <div class="flex items-center gap-1.5">
+                <button type="button" id="template-panel-compact-btn" onclick="toggleTemplateCompactMode()"
+                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">>></button>
+                <button type="button" onclick="closeTemplatePanel()"
+                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">Close</button>
+            </div>
+        </div>
+        <div id="template-panel-body" class="p-3 space-y-2">
+            <select id="template-select" onchange="onTemplateSelectChange()"
+                class="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs"></select>
+            <input type="text" id="template-name-input" placeholder="양식 이름"
+                class="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs">
+            <input type="text" id="template-desc-input" placeholder="양식 설명(선택)"
+                class="w-full px-2.5 py-1.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs">
+            <textarea id="template-preview"
+                class="w-full h-56 px-2.5 py-2 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs font-mono"></textarea>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="insertSelectedTemplateToDocument()"
+                    class="px-3 py-1.5 rounded bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700">양식을 문서에 삽입</button>
+                <button type="button" onclick="insertSelectedTemplateAsNewFile()"
+                    class="px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">새파일로 삽입</button>
+                <button type="button" onclick="saveEditedTemplate()"
+                    class="px-3 py-1.5 rounded border border-emerald-400 dark:border-emerald-600 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20">양식 저장</button>
+                <button type="button" onclick="addTemplateFromCurrentContent()"
+                    class="px-3 py-1.5 rounded border-2 border-slate-900 dark:border-slate-200 text-xs font-semibold text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700">+양식 추가</button>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="exportSelectedTemplateMd()"
+                    class="px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">양식 Export</button>
+                <button type="button" onclick="triggerTemplateImportMd()"
+                    class="px-3 py-1.5 rounded border border-slate-300 dark:border-slate-600 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700">양식 Import</button>
+                <input type="file" id="template-import-file" accept=".md,text/markdown,text/plain" onchange="importTemplateMdFile(event)" class="hidden">
+            </div>
+        </div>
+        <div id="template-panel-resizer" title="Resize"
+            class="absolute right-0 bottom-0 w-4 h-4 cursor-nwse-resize opacity-70 hover:opacity-100 select-none"
+            style="background:linear-gradient(135deg,transparent 45%,#94a3b8 46%,#94a3b8 54%,transparent 55%);"></div>
+    </div>
+
+    <div id="html2ppt-panel" class="fixed top-20 right-3 hidden flex-col z-50 no-print w-[min(980px,96vw)] h-[min(760px,86vh)] rounded-lg border border-slate-300 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 shadow-2xl backdrop-blur-sm">
+        <div id="html2ppt-panel-header" class="flex items-center justify-between px-3 py-2 border-b border-slate-200 dark:border-slate-700 cursor-move select-none">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">GenSlide</h3>
+            <div class="flex items-center gap-1.5">
+                <button type="button" id="html2ppt-panel-full-btn" onclick="toggleHtml2pptPanelFullscreen()"
+                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">전체</button>
+                <button type="button" id="html2ppt-panel-dock-btn" onclick="toggleHtml2pptDockRight()"
+                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">>></button>
+                <button type="button" onclick="closeHtml2pptPanel()"
+                    class="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">Close</button>
+            </div>
+        </div>
+        <div id="html2ppt-panel-body" class="flex-1 p-2 min-h-0">
+            <iframe id="html2ppt-frame" src="./js/Html2pptx/jenaEditor/index.html?v=20260603-3"
+                class="w-full h-full border-0 rounded bg-white dark:bg-slate-900" title="GenSlide"></iframe>
+        </div>
+        <div id="html2ppt-panel-resizer" title="Resize"
+            class="absolute right-0 bottom-0 w-4 h-4 cursor-nwse-resize opacity-70 hover:opacity-100 select-none"
+            style="background:linear-gradient(135deg,transparent 45%,#94a3b8 46%,#94a3b8 54%,transparent 55%);"></div>
+    </div>
+
+    <script src="./js/math_render/math_render.js?v=20260428-1" charset="utf-8" defer></script>
+    <script src="./js/math_render/latex_render.js?v=20260415-1" charset="utf-8" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-mml-chtml.min.js" defer></script>
+    <script src="./trt/special_trt.js?v=20260415-3" charset="utf-8" defer></script>
+    <script src="./js/mermaid/mermaid_render.js?v=20260626-10001" charset="utf-8" defer></script>
+    <script src="./Setting/user.js" charset="utf-8" defer></script>
+    <script src="./hotkey/hotkey.js" charset="utf-8" defer></script>
+    <script src="./imageDB/imageDB.js" charset="utf-8" defer></script>
+    <script src="./imageDB/image_insert.js" charset="utf-8" defer></script>
+    <script src="./js/Scholarref/scholarref.js?v=20260402-1" charset="utf-8" defer></script>
+    <script src="./js/Scholarref/scholarsearch-shell.js?v=20260424-1" charset="utf-8" defer></script>
+    <script src="./js/templates/templates.js" charset="utf-8" defer></script>
+    <script src="./file_format/file_format.js?v=20260408-1" charset="utf-8" defer></script>
+    <script src="./js/extendFiles/extend-files.js" charset="utf-8" defer></script>
+    <script src="./sidebarAI/Scholarai_prompt.js?v=20260406-1" charset="utf-8" defer></script>
+    <script src="./sidebarAI/insert.js?v=20260407-1" charset="utf-8" defer></script>
+    <script src="./sidebarAI/sketchpad/ai-sketch-pad.js?v=20260604-1" charset="utf-8" defer></script>
+    <script src="./trt/editorRule.js" charset="utf-8" defer></script>
+    <script src="./trt/macro.js?v=20260408-1" charset="utf-8" defer></script>
+    <script src="./trt/ai-panel-avoid.js?v=20260604-1" charset="utf-8" defer></script>
+    <script src="./ShareSites/Share/share.js?v=20260603-2" charset="utf-8" defer></script>
+    <script src="./ShareSites/googleDocs.js?v=20260330-1" charset="utf-8" defer></script>
+    <script src="./ShareSites/sitesshow/sitesshow.js?v=20260603-1" charset="utf-8" defer></script>
+    <script src="./js/export/html-export.js" charset="utf-8" defer></script>
+    <script src="./js/GithubData/github-settings.js?v=20260428-1" charset="utf-8" defer></script>
+    <script src="./Setting/settings-ui.js?v=20260603-1" charset="utf-8" defer></script>
+    <script src="./sidebar_left/sidebar-left.js?v=20260603-1" charset="utf-8" defer></script>
+    <script src="./js/Imagetool/link-image-modal.js?v=20260604-1" charset="utf-8" defer></script>
+    <script src="./js/Tidy/tidy-actions.js?v=20260604-1" charset="utf-8" defer></script>
+    <script src="./js/UI_PV/minipv.js?v=20260603-3" charset="utf-8" defer></script>
+    <script src="./js/app.js?v=20260603-13" charset="utf-8" defer></script>
+    <script src="./js/GithubData/github-app.js?v=20260603-1" charset="utf-8" defer></script>
+    <script src="./js/viewmode/viewmode-edit-input.js?v=20260602-1" charset="utf-8" defer></script>
+    <script src="./js/UI_PV/editpv.js?v=20260603-1" charset="utf-8" defer></script>
+    <script src="./js/MergeDoc/merge.js?v=20260603-3" charset="utf-8" defer></script>
+    <script src="https://apis.google.com/js/api.js" defer onload="onGoogleApiJsLoaded()"></script>
+    <script src="https://accounts.google.com/gsi/client" defer onload="onGoogleGisLoaded()"></script>
+
+<script data-web2electron-open-file-helper>
+(function () {
+  var dispatched = false;
+  function dispatchOnce(p, text) {
+    if (!p || dispatched) return;
+    dispatched = true;
+    var detail = { path: p };
+    if (text != null && text !== '') detail.text = text;
+    try {
+      window.dispatchEvent(new CustomEvent('electron-open-file', { detail: detail }));
+    } catch (_) {}
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('web2electronOpenPath', p);
+        if (detail.text && detail.text.length < 2000000) {
+          sessionStorage.setItem('web2electronOpenText', detail.text);
+        }
+      }
+    } catch (_) {}
+  }
+  function normalizePayload(r) {
+    if (r == null) return { path: null, text: null };
+    if (typeof r === 'string') return { path: r, text: null };
+    return { path: r.path || null, text: r.text != null ? r.text : null };
+  }
+  function bind() {
+    if (typeof window.web2electron === 'undefined' || !window.web2electron) return;
+    if (window.web2electron.getOpenedFilePath) {
+      window.web2electron.getOpenedFilePath().then(function (r) {
+        var n = normalizePayload(r);
+        dispatchOnce(n.path, n.text);
+      });
+    }
+    if (window.web2electron.onOpenedFile) {
+      window.web2electron.onOpenedFile(function (filePath, text, payload) {
+        if (payload && typeof payload === 'object') {
+          if (!payload.path) payload.path = filePath;
+          if (payload.text == null) payload.text = text;
+          try {
+            window.dispatchEvent(new CustomEvent('electron-open-file', { detail: payload }));
+            return;
+          } catch (_) {}
+        }
+        dispatchOnce(filePath, text);
+      });
+    }
+    if (window.web2electron.onOpenedFolder) {
+      window.web2electron.onOpenedFolder(function (folder) {
+        if (window.setWorkspaceFolder) window.setWorkspaceFolder(folder);
+      });
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
+  else bind();
+})();
+</script>
+</body>
+
+</html>
