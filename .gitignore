@@ -7,3 +7,6 @@ yarn-error.log*
 
 .DS_Store
 Thumbs.db
+
+push.bat
+push.py
