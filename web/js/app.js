@@ -570,6 +570,16 @@ function initUserSettingsModule() {
 
 window.onload = async () => {
     try {
+        // The desktop app must always start with the left sidebar visible and expanded.
+        // This is applied before other startup work so no previous in-memory state wins.
+        if (window.web2electron) {
+            isSidebarHidden = false;
+            isSidebarCollapsed = false;
+            if (sidebar) {
+                sidebar.style.display = 'flex';
+                sidebar.classList.remove('sidebar-collapsed');
+            }
+        }
         if (window.MiniPreviewUI && window.MiniPreviewUI.ready && typeof window.MiniPreviewUI.ready.then === 'function') {
             await window.MiniPreviewUI.ready;
         }
@@ -1878,9 +1888,8 @@ async function readFile(file, options) {
         });
         return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const raw = e.target.result;
+    try {
+        const raw = decodeOpenedTextBytes(await file.arrayBuffer()).text;
         const parsed = (formatApi && typeof formatApi.parseFileText === 'function')
             ? formatApi.parseFileText(name, raw)
             : null;
@@ -1928,8 +1937,42 @@ async function readFile(file, options) {
         updateContent(parsed && typeof parsed.text === 'string' ? parsed.text : raw);
         markPersistedState();
         showToast("File loaded successfully.");
-    };
-    reader.readAsText(file, 'UTF-8');
+    } catch (err) {
+        showToast('Failed to read file: ' + (err && err.message ? err.message : err));
+    }
+}
+
+function decodeOpenedTextBytes(arrayBuffer) {
+    const bytes = new Uint8Array(arrayBuffer || new ArrayBuffer(0));
+    if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+        return { text: new TextDecoder('utf-8').decode(bytes.subarray(3)), encoding: 'utf-8' };
+    }
+    if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+        return { text: new TextDecoder('utf-16le').decode(bytes.subarray(2)), encoding: 'utf-16le' };
+    }
+    if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+        return { text: new TextDecoder('utf-16be').decode(bytes.subarray(2)), encoding: 'utf-16be' };
+    }
+    const sampleLength = Math.min(bytes.length, 4096);
+    let evenNuls = 0;
+    let oddNuls = 0;
+    for (let i = 0; i < sampleLength; i++) {
+        if (bytes[i] === 0) {
+            if (i % 2) oddNuls++;
+            else evenNuls++;
+        }
+    }
+    if (sampleLength >= 4 && oddNuls > sampleLength / 8 && evenNuls < sampleLength / 32) {
+        return { text: new TextDecoder('utf-16le').decode(bytes), encoding: 'utf-16le' };
+    }
+    if (sampleLength >= 4 && evenNuls > sampleLength / 8 && oddNuls < sampleLength / 32) {
+        return { text: new TextDecoder('utf-16be').decode(bytes), encoding: 'utf-16be' };
+    }
+    try {
+        return { text: new TextDecoder('utf-8', { fatal: true }).decode(bytes), encoding: 'utf-8' };
+    } catch (_) {
+        return { text: new TextDecoder('windows-949').decode(bytes), encoding: 'cp949' };
+    }
 }
 
 async function importMddDocumentFile(file, options) {
@@ -2589,34 +2632,7 @@ let currentActionCallback = null;
 
 function createNewFolder() {
     if (currentStorageSourceTab === 'workspace' && currentWorkspaceFolder) {
-        const modal = document.getElementById('save-modal');
-        document.querySelector('#save-modal h3').textContent = '새 로컬 폴더 생성';
-        document.querySelector('#save-modal label').textContent = '폴더 이름';
-        const input = document.getElementById('save-title-input');
-        input.value = '';
-
-        currentActionCallback = async (name) => {
-            const trimmed = String(name || '').trim();
-            if (!trimmed) return;
-            const currentDir = getWorkspaceCurrentDir();
-            const result = await window.web2electron.createDirectory({
-                rootPath: currentWorkspaceFolder.path,
-                dirPath: currentDir,
-                folderName: trimmed
-            });
-            if (result && result.error) {
-                showToast('폴더 생성 실패: ' + result.error);
-                return;
-            }
-            showToast('로컬 폴더를 생성했습니다: ' + trimmed);
-            workspaceFolderCache.clear();
-            renderDBList();
-        };
-
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        input.focus();
-        return;
+        return createNewFolderInWorkspace(getWorkspaceCurrentDir());
     }
 
     const modal = document.getElementById('save-modal');
@@ -2638,7 +2654,39 @@ function createNewFolder() {
     input.focus();
 }
 
-function createNewFileWorkspace() {
+function createNewFolderInWorkspace(targetDir) {
+    if (currentWorkspaceFolder) {
+        const modal = document.getElementById('save-modal');
+        document.querySelector('#save-modal h3').textContent = '새 로컬 폴더 생성';
+        document.querySelector('#save-modal label').textContent = '폴더 이름';
+        const input = document.getElementById('save-title-input');
+        input.value = '';
+
+        currentActionCallback = async (name) => {
+            const trimmed = String(name || '').trim();
+            if (!trimmed) return;
+            const result = await window.web2electron.createDirectory({
+                rootPath: getWorkspaceDisplayRoot() || currentWorkspaceFolder.path,
+                dirPath: String(targetDir || getWorkspaceCurrentDir()),
+                folderName: trimmed
+            });
+            if (result && result.error) {
+                showToast('폴더 생성 실패: ' + result.error);
+                return;
+            }
+            showToast('로컬 폴더를 생성했습니다: ' + trimmed);
+            workspaceFolderCache.clear();
+            renderDBList();
+        };
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        input.focus();
+        return;
+    }
+}
+
+function createNewFileWorkspace(targetDir) {
     if (!currentWorkspaceFolder) {
         showToast('작업 폴더가 열려있지 않습니다.');
         return;
@@ -2655,10 +2703,9 @@ function createNewFileWorkspace() {
         if (!/\.[a-z0-9]+$/i.test(trimmed)) {
             trimmed += '.md';
         }
-        const currentDir = getWorkspaceCurrentDir();
         const result = await window.web2electron.createWorkspaceFile({
-            rootPath: currentWorkspaceFolder.path,
-            dirPath: currentDir,
+            rootPath: getWorkspaceDisplayRoot() || currentWorkspaceFolder.path,
+            dirPath: String(targetDir || getWorkspaceCurrentDir()),
             fileName: trimmed,
             content: '# ' + trimmed.replace(/\.md$/i, '') + '\n\n'
         });
@@ -3127,10 +3174,30 @@ function toggleWorkspaceTreeDirectory(dirPath) {
     renderDBList({ preserveScroll: true });
 }
 
+function createWorkspaceFolderActions(dirPath) {
+    const actions = document.createElement('span');
+    actions.className = 'shrink-0 flex items-center gap-0.5';
+    actions.innerHTML = '<button type="button" class="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-slate-300 dark:hover:bg-slate-600" title="이 폴더에 새 파일" aria-label="이 폴더에 새 파일"><i data-lucide="file-plus" class="w-3.5 h-3.5"></i></button>'
+        + '<button type="button" class="p-1 rounded text-slate-400 hover:text-amber-600 hover:bg-slate-300 dark:hover:bg-slate-600" title="이 폴더에 새 폴더" aria-label="이 폴더에 새 폴더"><i data-lucide="folder-plus" class="w-3.5 h-3.5"></i></button>';
+    const buttons = actions.querySelectorAll('button');
+    buttons[0].onclick = function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        createNewFileWorkspace(dirPath);
+    };
+    buttons[1].onclick = function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        createNewFolderInWorkspace(dirPath);
+    };
+    return actions;
+}
+
 function createWorkspaceTreeRow(item, depth, isExpanded) {
     const isDir = item && item.type === 'directory';
-    const row = document.createElement('button');
-    row.type = 'button';
+    const row = document.createElement('div');
+    row.setAttribute('role', 'button');
+    row.tabIndex = 0;
     row.dataset.workspacePath = String(item.path || '');
     row.className = 'w-full group flex items-center gap-1.5 py-1.5 pr-2 rounded-md text-left hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors';
     row.style.paddingLeft = Math.max(6, 6 + (Number(depth) || 0) * 14) + 'px';
@@ -3141,6 +3208,7 @@ function createWorkspaceTreeRow(item, depth, isExpanded) {
     row.innerHTML = chevron
         + '<i data-lucide="' + getWorkspaceFileIcon(item) + '" class="w-4 h-4 shrink-0 ' + getWorkspaceFileIconClass(item) + '"></i>'
         + '<span class="min-w-0 flex-1 truncate text-xs font-medium">' + escapeHtmlText(item.name || '') + '</span>';
+    if (isDir) row.appendChild(createWorkspaceFolderActions(item.path));
     row.onclick = function (event) {
         event.preventDefault();
         if (isDir) toggleWorkspaceTreeDirectory(item.path);
@@ -3149,6 +3217,12 @@ function createWorkspaceTreeRow(item, depth, isExpanded) {
     row.ondblclick = function (event) {
         event.preventDefault();
         if (isDir) openWorkspaceDirectory(item.path);
+    };
+    row.onkeydown = function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        if (isDir) toggleWorkspaceTreeDirectory(item.path);
+        else openWorkspaceFile(item.path);
     };
     return row;
 }
@@ -3202,14 +3276,22 @@ function renderWorkspaceFlatItems(container, items, query) {
         const name = String(item.name || '').toLowerCase();
         if (query && !name.includes(query)) return;
         const isDir = item.type === 'directory';
-        const row = document.createElement('button');
-        row.type = 'button';
+        const row = document.createElement('div');
+        row.setAttribute('role', 'button');
+        row.tabIndex = 0;
         row.dataset.workspacePath = String(item.path || '');
         row.className = 'w-full group flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors';
         row.title = String(item.relativePath || item.path || item.name || '');
         row.innerHTML = '<i data-lucide="' + getWorkspaceFileIcon(item) + '" class="w-4 h-4 shrink-0 ' + getWorkspaceFileIconClass(item) + '"></i>'
             + '<span class="min-w-0 flex-1 truncate text-xs font-medium">' + escapeHtmlText(item.name || '') + '</span>';
+        if (isDir) row.appendChild(createWorkspaceFolderActions(item.path));
         row.onclick = function () {
+            if (isDir) openWorkspaceDirectory(item.path);
+            else openWorkspaceFile(item.path);
+        };
+        row.onkeydown = function (event) {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
             if (isDir) openWorkspaceDirectory(item.path);
             else openWorkspaceFile(item.path);
         };
@@ -3236,7 +3318,7 @@ async function renderWorkspaceList(listEl, searchTerm) {
     const query = String(searchTerm || '').trim().toLowerCase();
 
     const header = document.createElement('div');
-    header.className = 'mb-2 p-2 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700';
+    header.className = 'sticky top-0 z-20 mb-2 p-2 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm';
     header.innerHTML = '<div class="flex items-center gap-2 min-w-0">'
         + '<button type="button" onclick="goWorkspaceHistoryBack()" class="shrink-0 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed" title="뒤로" ' + (canGoWorkspaceHistoryBack() ? '' : 'disabled') + '><i data-lucide="arrow-left" class="w-3.5 h-3.5"></i></button>'
         + '<button type="button" onclick="goWorkspaceHistoryForward()" class="shrink-0 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed" title="앞으로" ' + (canGoWorkspaceHistoryForward() ? '' : 'disabled') + '><i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></button>'
@@ -3244,6 +3326,8 @@ async function renderWorkspaceList(listEl, searchTerm) {
         + '<div class="min-w-0 flex-1"><div class="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">'
         + escapeHtmlText(currentDirName) + '</div>'
         + '<div class="text-[10px] text-slate-400 dark:text-slate-500 truncate">' + escapeHtmlText(relLabel || (result.dirPath || dirPath)) + '</div></div>'
+        + '<button type="button" onclick="createNewFileWorkspace()" class="shrink-0 p-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="현재 폴더에 새 파일" aria-label="현재 폴더에 새 파일"><i data-lucide="file-plus" class="w-3.5 h-3.5"></i></button>'
+        + '<button type="button" onclick="createNewFolderInWorkspace(getWorkspaceCurrentDir())" class="shrink-0 p-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="현재 폴더에 새 폴더" aria-label="현재 폴더에 새 폴더"><i data-lucide="folder-plus" class="w-3.5 h-3.5"></i></button>'
         + '<button type="button" id="btn-workspace-refresh" onclick="refreshWorkspaceFolder()" class="shrink-0 p-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="폴더 새로고침" aria-label="폴더 새로고침"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i></button>'
         + '<button type="button" onclick="toggleWorkspaceTreeView()" class="text-[10px] px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="폴더 트리 보기 전환">' + (workspaceTreeViewEnabled ? '트리 ON' : '트리 OFF') + '</button>'
         + '<button type="button" onclick="closeWorkspaceFolder()" class="text-[10px] px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="작업 폴더 닫기">x</button>'
@@ -8942,6 +9026,7 @@ window.toggleSidebarVisibility = toggleSidebarVisibility;
 window.toggleSidebarCollapse = toggleSidebarCollapse;
 window.ensureRootFolder = ensureRootFolder;
 window.createNewFolder = createNewFolder;
+window.createNewFolderInWorkspace = createNewFolderInWorkspace;
 window.createNewFileWorkspace = createNewFileWorkspace;
 window.deleteFolderFromDB = deleteFolderFromDB;
 window.saveToDB = saveToDB;

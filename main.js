@@ -7,6 +7,7 @@ const { execFile } = require('child_process');
 const { pathToFileURL } = require('url');
 const mammoth = require('mammoth');
 const preloadPath = path.join(__dirname, 'preload.js');
+const appIconPath = path.join(__dirname, 'assets', 'icon.png');
 
 process.env.LANG = 'ko_KR.UTF-8';
 
@@ -102,6 +103,7 @@ function openHelpDocument() {
       return;
     }
     helpWindow = new BrowserWindow({
+      icon: appIconPath,
       width: 880,
       height: 720,
       minWidth: 400,
@@ -375,7 +377,7 @@ function tryReadFileTextUtf8(p) {
     if (!fs.existsSync(p)) return null;
     const st = fs.statSync(p);
     if (!st.isFile() || st.size > MAX_OPEN_FILE_BYTES) return null;
-    return fs.readFileSync(p, 'utf8');
+    return decodeTextBuffer(fs.readFileSync(p)).text;
   } catch (_) {
     return null;
   }
@@ -517,7 +519,7 @@ async function readWorkspaceFile(rootPath, filePath) {
     return {
       path: resolved,
       fileName: getNameFromPath(resolved),
-      text: fs.readFileSync(resolved, 'utf8'),
+        text: decodeTextBuffer(fs.readFileSync(resolved)).text,
     };
   } catch (err) {
     return { error: err && err.message ? err.message : String(err) };
@@ -544,7 +546,7 @@ async function readDirectSupportedTextFile(filePath) {
   return {
     path: resolved,
     fileName: getNameFromPath(resolved),
-    text: fs.readFileSync(resolved, 'utf8'),
+    text: decodeTextBuffer(fs.readFileSync(resolved)).text,
   };
 }
 
@@ -570,6 +572,7 @@ async function openSupportedFileFromDialog(browserWindow, filePath) {
 function createPdfViewerWindow(filePath) {
   const resolved = path.resolve(String(filePath || ''));
   const viewerWindow = new BrowserWindow({
+    icon: appIconPath,
     width: 1100,
     height: 820,
     minWidth: 520,
@@ -598,9 +601,58 @@ function createPdfViewerWindow(filePath) {
   return viewerWindow;
 }
 
+// Decode text files without assuming UTF-8. Korean Windows tools commonly save
+// Markdown as CP949, while some editors use UTF-16 with or without a BOM.
+function decodeTextBuffer(buffer) {
+  const bytes = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || []);
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    return { text: bytes.subarray(3).toString('utf8'), encoding: 'utf-8' };
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return { text: bytes.subarray(2).toString('utf16le'), encoding: 'utf-16le' };
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return { text: decodeUtf16Be(bytes.subarray(2)), encoding: 'utf-16be' };
+  }
+  const sampleLength = Math.min(bytes.length, 4096);
+  let evenNuls = 0;
+  let oddNuls = 0;
+  for (let i = 0; i < sampleLength; i++) {
+    if (bytes[i] === 0) {
+      if (i % 2) oddNuls++;
+      else evenNuls++;
+    }
+  }
+  if (sampleLength >= 4 && oddNuls > sampleLength / 8 && evenNuls < sampleLength / 32) {
+    return { text: bytes.toString('utf16le'), encoding: 'utf-16le' };
+  }
+  if (sampleLength >= 4 && evenNuls > sampleLength / 8 && oddNuls < sampleLength / 32) {
+    return { text: decodeUtf16Be(bytes), encoding: 'utf-16be' };
+  }
+  try {
+    return { text: new TextDecoder('utf-8', { fatal: true }).decode(bytes), encoding: 'utf-8' };
+  } catch (_) {
+    try {
+      return { text: new TextDecoder('windows-949').decode(bytes), encoding: 'cp949' };
+    } catch (_) {
+      return { text: bytes.toString('utf8'), encoding: 'utf-8' };
+    }
+  }
+}
+
+function decodeUtf16Be(bytes) {
+  const swapped = Buffer.allocUnsafe(bytes.length - (bytes.length % 2));
+  for (let i = 0; i < swapped.length; i += 2) {
+    swapped[i] = bytes[i + 1];
+    swapped[i + 1] = bytes[i];
+  }
+  return swapped.toString('utf16le');
+}
+
 function createImageViewerWindow(filePath) {
   const resolved = path.resolve(String(filePath || ''));
   const viewerWindow = new BrowserWindow({
+    icon: appIconPath,
     width: 1100,
     height: 820,
     minWidth: 360,
@@ -645,6 +697,7 @@ function createGenSlideImageHtml(imagePath, index, total) {
 
 function createGenSlideWindowWithSlides(slideItems, title) {
   const viewerWindow = new BrowserWindow({
+    icon: appIconPath,
     width: 1280,
     height: 860,
     minWidth: 720,
@@ -713,6 +766,7 @@ function createPptxHtmlViewerWindow(filePath) {
   }
 
   const viewerWindow = new BrowserWindow({
+    icon: appIconPath,
     width: 1280,
     height: 860,
     minWidth: 720,
@@ -774,6 +828,7 @@ async function createDocxViewerWindow(filePath) {
     + '</body></html>';
 
   const viewerWindow = new BrowserWindow({
+    icon: appIconPath,
     width: 1100,
     height: 820,
     minWidth: 520,
@@ -1108,6 +1163,7 @@ function createWindow() {
   ipcInitialPath = openPath;
 
   const win = new BrowserWindow({
+    icon: appIconPath,
     width: 1280,
     height: 800,
     resizable: true,
@@ -1151,6 +1207,7 @@ function createWindow() {
     return {
       action: 'allow',
       overrideBrowserWindowOptions: {
+        icon: appIconPath,
         width: 1200,
         height: 800,
         minWidth: 320,

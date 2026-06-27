@@ -3,6 +3,8 @@ setlocal
 
 cd /d "%~dp0"
 
+set "APP_ICON=assets\icon.png"
+
 echo.
 echo [MDpro] Windows build started.
 echo Project: %CD%
@@ -23,9 +25,17 @@ if errorlevel 1 (
   exit /b 1
 )
 
+if not exist "%APP_ICON%" (
+  echo [ERROR] App icon not found: %CD%\%APP_ICON%
+  pause
+  exit /b 1
+)
+
+echo [MDpro] App icon: %CD%\%APP_ICON%
+
 if not exist "node_modules" (
   echo [MDpro] node_modules not found. Installing dependencies...
-  npm ci
+  call npm ci
   if errorlevel 1 (
     echo [ERROR] npm ci failed.
     pause
@@ -33,8 +43,14 @@ if not exist "node_modules" (
   )
 )
 
-echo [MDpro] Building installer into dist...
-npm run build:win
+rem Force electron-builder to regenerate its ICO conversion when icon.png changes.
+if exist "dist\.icon-ico" (
+  echo [MDpro] Clearing generated icon cache...
+  rmdir /s /q "dist\.icon-ico"
+)
+
+echo [MDpro] Building installer into dist with the MDpro icon...
+call npm run build:win -- --config.win.icon="%APP_ICON%"
 if errorlevel 1 (
   echo [ERROR] Build failed.
   pause

@@ -26,6 +26,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "assets/**/*",
       "web/**/*",
       "build/installer.nsh",
       "build/windows-uninstall.txt"
