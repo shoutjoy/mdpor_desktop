@@ -302,6 +302,13 @@ function createAppMenu() {
       label: 'Window',
       submenu: [
         { role: 'minimize' },
+        {
+          label: 'HTML 렌더',
+          click: (_menuItem, browserWindow) => {
+            sendMenuCommand(browserWindow, { type: 'pptx-html-render' });
+          },
+        },
+        { type: 'separator' },
         ...(isMac ? [{ role: 'zoom' }, { type: 'separator' }, { role: 'front' }] : []),
         { role: 'close' },
       ],
@@ -559,10 +566,17 @@ function createPdfViewerWindow(filePath) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      webSecurity: false,
       preload: preloadPath,
     },
   });
-  viewerWindow.loadURL(pathToFileURL(resolved).toString());
+  viewerWindow.loadFile(path.join(__dirname, 'web', 'pdf-viewer.html'), {
+    query: {
+      file: pathToFileURL(resolved).toString(),
+      path: resolved,
+      title: getNameFromPath(resolved),
+    },
+  });
   return viewerWindow;
 }
 

@@ -208,7 +208,7 @@
   <div class="toolbar">
     <div class="title" id="title">PPTX Preview</div>
     <div class="status" id="status">loading</div>
-    <button type="button" id="html-btn">HTML 렌더</button>
+    <button type="button" id="html-btn" style="display: none;">HTML 렌더</button>
     <div id="view-controls" style="display: none;">
       <button type="button" data-view-mode="single">한 페이지</button>
       <button type="button" data-view-mode="2-page">2 페이지</button>
@@ -537,6 +537,8 @@
           zoomBy(-0.1);
         } else if (command.type === 'pptx-zoom-fit') {
           resetFitZoom();
+        } else if (command.type === 'pptx-html-render') {
+          renderHtml('PPTX를 다시 렌더링하는 중입니다.');
         }
       }
 
