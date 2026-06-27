@@ -368,7 +368,7 @@
       if (!frame || viewMode === 'single') return;
       const clickedIndex = Number(frame.dataset.pageIndex);
       setViewMode('single', clickedIndex);
-      requestAnimationFrame(() => scrollToPage(clickedIndex));
+      scrollToPage(clickedIndex);
     });
     viewer.addEventListener('wheel', (event) => {
       if (!event.ctrlKey || !pageEntries.length) return;

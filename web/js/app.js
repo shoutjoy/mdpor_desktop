@@ -3758,6 +3758,12 @@ function applyMathTidyInEditor() {
     }
 }
 
+function applyHtmlTidyInEditor() {
+    if (window.TidyActions && typeof window.TidyActions.applyHtml === 'function') {
+        window.TidyActions.applyHtml(getTidyActionDeps());
+    }
+}
+
 function closeTidyQuickMenu() {
     if (window.TidyActions && typeof window.TidyActions.closeMenu === 'function') {
         window.TidyActions.closeMenu();
@@ -9033,6 +9039,7 @@ window.toggleMacroVisibilitySection = toggleMacroVisibilitySection;
 window.tidySeparatorSpacingInEditor = tidySeparatorSpacingInEditor;
 window.applyEnterTidyInEditor = applyEnterTidyInEditor;
 window.applyMathTidyInEditor = applyMathTidyInEditor;
+window.applyHtmlTidyInEditor = applyHtmlTidyInEditor;
 window.closeTidyQuickMenu = closeTidyQuickMenu;
 window.toggleTidyQuickMenu = toggleTidyQuickMenu;
 window.toggleMathQuickMenu = toggleMathQuickMenu;

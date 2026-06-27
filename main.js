@@ -75,7 +75,24 @@ function setExternalOpenPref(extKey, checked) {
 }
 
 function openHelpDocument() {
-  if (!HELP_FILE) return;
+  if (!HELP_FILE) {
+    const options = {
+      type: 'info',
+      title: 'MDpro 프로그램 정보',
+      message: 'MDpro',
+      detail: [
+        '박중희 (연세대 심리학과 겸임교수)',
+        'shoutjoy1@yonsei.ac.kr',
+        '010-8800-9369',
+        '',
+        '(c) 자유자재교육/ 연세대학교 인지공학 연구실',
+      ].join('\n'),
+      buttons: ['확인'],
+      defaultId: 0,
+    };
+    const targetWindow = BrowserWindow.getFocusedWindow() || firstMainWindow;
+    return targetWindow ? dialog.showMessageBox(targetWindow, options) : dialog.showMessageBox(options);
+  }
   const docPath = path.join(__dirname, 'docs', HELP_FILE);
   if (!fs.existsSync(docPath)) return;
   const ext = path.extname(docPath).toLowerCase();
@@ -318,9 +335,10 @@ function createAppMenu() {
     label: 'Help',
     submenu: [
       {
-        label: HELP_FILE ? '도움말 문서' : '도움말 문서 (미번들)',
+        id: 'app-program-info',
+        label: HELP_FILE ? '도움말 문서' : '프로그램 정보',
         click: () => openHelpDocument(),
-        enabled: Boolean(HELP_FILE),
+        enabled: true,
       },
     ],
   });
