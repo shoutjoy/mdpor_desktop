@@ -226,6 +226,7 @@ let workspaceExpandedDirs = new Set();
 let workspaceFolderCache = new Map();
 let workspaceRenderSeq = 0;
 let workspaceTreeViewEnabled = true;
+let workspaceRefreshInProgress = false;
 let workspaceOpenChordTimer = null;
 let sidebarResizeBound = false;
 let workspaceMouseHistoryBound = false;
@@ -2877,6 +2878,19 @@ function toggleWorkspaceTreeView() {
     setWorkspaceTreeViewEnabled(!workspaceTreeViewEnabled);
 }
 
+async function refreshWorkspaceFolder() {
+    if (!currentWorkspaceFolder || !isElectronWorkspaceAvailable() || workspaceRefreshInProgress) return false;
+    workspaceRefreshInProgress = true;
+    workspaceFolderCache = new Map();
+    try {
+        await renderDBList({ preserveScroll: true });
+        showToast('폴더 내용을 새로고침했습니다.');
+        return true;
+    } finally {
+        workspaceRefreshInProgress = false;
+    }
+}
+
 function getWorkspaceCurrentDir() {
     if (!currentWorkspaceFolder || !currentWorkspaceFolder.path) return '';
     return workspaceDirectoryStack.length
@@ -3230,6 +3244,7 @@ async function renderWorkspaceList(listEl, searchTerm) {
         + '<div class="min-w-0 flex-1"><div class="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">'
         + escapeHtmlText(currentDirName) + '</div>'
         + '<div class="text-[10px] text-slate-400 dark:text-slate-500 truncate">' + escapeHtmlText(relLabel || (result.dirPath || dirPath)) + '</div></div>'
+        + '<button type="button" id="btn-workspace-refresh" onclick="refreshWorkspaceFolder()" class="shrink-0 p-1 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="폴더 새로고침" aria-label="폴더 새로고침"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i></button>'
         + '<button type="button" onclick="toggleWorkspaceTreeView()" class="text-[10px] px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="폴더 트리 보기 전환">' + (workspaceTreeViewEnabled ? '트리 ON' : '트리 OFF') + '</button>'
         + '<button type="button" onclick="closeWorkspaceFolder()" class="text-[10px] px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" title="작업 폴더 닫기">x</button>'
         + '</div>';
@@ -9037,6 +9052,7 @@ window.clearMacroEntryShortcut = clearMacroEntryShortcut;
 window.dockMacroMenuRight = dockMacroMenuRight;
 window.toggleMacroVisibilitySection = toggleMacroVisibilitySection;
 window.tidySeparatorSpacingInEditor = tidySeparatorSpacingInEditor;
+window.refreshWorkspaceFolder = refreshWorkspaceFolder;
 window.applyEnterTidyInEditor = applyEnterTidyInEditor;
 window.applyMathTidyInEditor = applyMathTidyInEditor;
 window.applyHtmlTidyInEditor = applyHtmlTidyInEditor;
