@@ -251,36 +251,51 @@ function createAppMenu() {
         { type: 'separator' },
         {
           label: '한 페이지 스크롤',
+          accelerator: 'Alt+1',
           type: 'radio',
           checked: true,
           click: (menuItem, browserWindow) => {
-            if (browserWindow) {
-              browserWindow.webContents.send('set-view-mode', 'single');
-            }
+            sendMenuCommand(browserWindow, { type: 'pptx-view-mode', mode: 'single' });
           }
         },
         {
           label: '두 페이지 보기',
+          accelerator: 'Alt+2',
           type: 'radio',
           click: (menuItem, browserWindow) => {
-            if (browserWindow) {
-              browserWindow.webContents.send('set-view-mode', '2-page');
-            }
+            sendMenuCommand(browserWindow, { type: 'pptx-view-mode', mode: '2-page' });
           }
         },
         {
           label: '매트릭스 보기',
+          accelerator: 'Alt+3',
           type: 'radio',
           click: (menuItem, browserWindow) => {
-            if (browserWindow) {
-              browserWindow.webContents.send('set-view-mode', 'matrix');
-            }
+            sendMenuCommand(browserWindow, { type: 'pptx-view-mode', mode: 'matrix' });
           }
         },
         { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
+        {
+          label: 'Actual Size',
+          accelerator: 'Ctrl+0',
+          click: (menuItem, browserWindow) => {
+            sendMenuCommand(browserWindow, { type: 'pptx-zoom-fit' });
+          }
+        },
+        {
+          label: 'Zoom In',
+          accelerator: 'Ctrl+Plus',
+          click: (menuItem, browserWindow) => {
+            sendMenuCommand(browserWindow, { type: 'pptx-zoom-in' });
+          }
+        },
+        {
+          label: 'Zoom Out',
+          accelerator: 'Ctrl+-',
+          click: (menuItem, browserWindow) => {
+            sendMenuCommand(browserWindow, { type: 'pptx-zoom-out' });
+          }
+        },
       ],
     },
     {

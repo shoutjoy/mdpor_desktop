@@ -10,7 +10,8 @@
     html, body {
       margin: 0;
       width: 100%;
-      min-height: 100%;
+      height: 100%;
+      overflow: hidden;
       background: #0f172a;
       color: #e5e7eb;
       font-family: "Malgun Gothic", "Segoe UI", Arial, sans-serif;
@@ -64,18 +65,18 @@
     }
     #viewer {
       box-sizing: border-box;
-      min-height: calc(100vh - 42px);
+      height: calc(100vh - 42px);
       padding: 18px 18px 28px;
-      overflow-x: hidden;
+      overflow-x: auto;
       overflow-y: auto;
-      scroll-behavior: smooth;
+      scroll-behavior: auto;
     }
     #all_slides_warpper {
       width: 100% !important;
       max-width: 100% !important;
       display: flex !important;
       flex-direction: column !important;
-      align-items: flex-start !important;
+      align-items: center !important;
       box-sizing: border-box !important;
       height: auto !important;
       gap: 28px;
@@ -87,27 +88,14 @@
     #viewer.matrix-view #all_slides_warpper,
     #viewer.grid-2 #all_slides_warpper {
       display: grid !important;
-      grid-template-columns: repeat(auto-fit, minmax(var(--matrix-cell-width, 400px), 1fr));
       gap: 24px;
       align-items: center;
       justify-content: center;
-    }
-    #viewer.matrix-view #all_slides_warpper {
-      display: grid !important;
-      grid-template-columns: repeat(auto-fit, minmax(var(--matrix-cell-width, 400px), 1fr));
-      gap: 24px;
-      align-items: center;
-      justify-content: center;
-    }
-    #viewer.grid-2 #all_slides_warpper {
-      grid-template-columns: repeat(2, 1fr);
-    }
-    #viewer.grid-3 #all_slides_warpper {
-      grid-template-columns: repeat(3, 1fr);
     }
     #viewer.matrix-view .slide-container,
     #viewer.grid-2 .slide-container {
       margin: 0 !important;
+      min-width: 0;
       cursor: pointer;
       transition: transform 0.2s, box-shadow 0.2s;
     }
@@ -160,6 +148,7 @@
       margin-left: 0 !important;
       margin-right: 0 !important;
       transform-origin: top left;
+      flex: 0 0 auto;
     }
     .slide {
       margin: 0 !important;
@@ -273,8 +262,20 @@
           return buf;
         });
       }
+      function normalizeSlideFrames() {
+        var wrapper = document.querySelector('#viewer #all_slides_warpper');
+        if (!wrapper) return [];
+        Array.prototype.slice.call(wrapper.children).forEach(function (child) {
+          if (!child.classList || !child.classList.contains('slide')) return;
+          var frame = document.createElement('div');
+          frame.className = 'slide-container';
+          child.parentNode.insertBefore(frame, child);
+          frame.appendChild(child);
+        });
+        return Array.prototype.slice.call(wrapper.querySelectorAll(':scope > .slide-container'));
+      }
       function getSlides() {
-        return Array.prototype.slice.call(document.querySelectorAll('#viewer .slide-container'));
+        return normalizeSlideFrames();
       }
       var zoomMode = 'fit';
       var manualZoom = 1;
@@ -292,71 +293,58 @@
         var label = document.getElementById('zoom-label');
         if (!label) return;
         var viewer = document.getElementById('viewer');
-        if (viewer.classList.contains('matrix-view')) {
-          var currentMatrixWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--matrix-cell-width') || '400', 10);
-          label.textContent = Math.round(currentMatrixWidth / 400 * 100) + '%';
-        } else {
-          label.textContent = zoomMode === 'fit' ? '맞춤' : Math.round(scale * 100) + '%';
-        }
+        label.textContent = zoomMode === 'fit' ? '맞춤' : Math.round(scale * 100) + '%';
       }
       function fitSlidesToWindow() {
         var viewer = document.getElementById('viewer');
         var slides = getSlides();
         if (!viewer || !slides.length) return;
+        var wrapper = document.getElementById('all_slides_warpper');
+        var isMatrix = viewer.classList.contains('matrix-view');
+        var isTwoPage = viewer.classList.contains('grid-2');
+        var gap = 24;
+        var availableWidth = Math.max(160, viewer.clientWidth - 36);
+        var availableHeight = Math.max(120, viewer.clientHeight - 36);
+        var firstSlide = slides[0].querySelector('.slide, .pptx-slide');
+        if (!firstSlide) return;
+        var naturalWidth = parseFloat(firstSlide.dataset.naturalWidth) || firstSlide.offsetWidth || 960;
+        var naturalHeight = parseFloat(firstSlide.dataset.naturalHeight) || firstSlide.offsetHeight || 540;
+        if (naturalWidth < 100) naturalWidth = 960;
+        if (naturalHeight < 100) naturalHeight = 540;
+        firstSlide.dataset.naturalWidth = naturalWidth;
+        firstSlide.dataset.naturalHeight = naturalHeight;
 
-        var isMultiView = viewer.classList.contains('matrix-view') || viewer.classList.contains('grid-2');
-        
-        slides.forEach(function(container) {
-            var slide = container.querySelector('.slide, .pptx-slide');
-            if (!slide) return;
-            slide.style.transform = '';
-            container.style.width = '';
-            container.style.height = '';
-            container.style.marginBottom = isMultiView ? '0' : '28px';
+        if (isTwoPage) {
+          fitScale = Math.min((availableWidth - gap) / 2 / naturalWidth, availableHeight / naturalHeight);
+        } else if (isMatrix) {
+          var targetWidth = Math.min(360, availableWidth);
+          var columns = Math.max(1, Math.floor((availableWidth + gap) / (targetWidth + gap)));
+          var cellWidth = (availableWidth - gap * (columns - 1)) / columns;
+          fitScale = Math.min(cellWidth / naturalWidth, 0.6);
+        } else {
+          fitScale = Math.min(availableWidth / naturalWidth, availableHeight / naturalHeight);
+        }
+        fitScale = Math.max(0.05, Math.min(3, fitScale));
+        var scale = zoomMode === 'fit' ? fitScale : manualZoom;
+        var scaledWidth = Math.max(1, Math.round(naturalWidth * scale));
+        var scaledHeight = Math.max(1, Math.round(naturalHeight * scale));
+
+        wrapper.style.gridTemplateColumns = (isTwoPage || isMatrix)
+          ? 'repeat(' + (isTwoPage ? 2 : Math.max(1, Math.floor((availableWidth + gap) / (scaledWidth + gap)))) + ', ' + scaledWidth + 'px)'
+          : '';
+        slides.forEach(function (container) {
+          var slide = container.querySelector('.slide, .pptx-slide');
+          if (!slide) return;
+          if (!slide.dataset.naturalWidth) slide.dataset.naturalWidth = slide.offsetWidth || naturalWidth;
+          if (!slide.dataset.naturalHeight) slide.dataset.naturalHeight = slide.offsetHeight || naturalHeight;
+          slide.style.transform = 'scale(' + scale + ')';
+          container.style.width = scaledWidth + 'px';
+          container.style.height = scaledHeight + 'px';
+          container.style.marginBottom = isTwoPage || isMatrix ? '0' : '28px';
         });
-
-        setTimeout(function() {
-            var availableWidth = Math.max(320, viewer.clientWidth - 40); // 넉넉히 여백 부여
-            var availableHeight = Math.max(240, viewer.clientHeight - 60);
-            var lastScale = 1;
-
-            slides.forEach(function (container) {
-                var slide = container.querySelector('.slide, .pptx-slide');
-                if (!slide) return;
-
-                // 인라인 속성에 기재된 자연 크기 가져오기 우선, 실패 시 실제 측정 크기
-                var naturalWidth = slide.offsetWidth || slide.scrollWidth || 960;
-                var naturalHeight = slide.offsetHeight || slide.scrollHeight || 540;
-
-                // pptxjs 라이브러리 슬라이드 기본 비율 처리 보완
-                if (naturalWidth < 100) naturalWidth = 960;
-                if (naturalHeight < 100) naturalHeight = 540;
-
-                if (isMultiView) {
-                    var containerWidth = container.clientWidth;
-                    if (containerWidth <= 0) return;
-                    var scale = containerWidth / naturalWidth;
-                    slide.style.transform = 'scale(' + scale + ')';
-                    container.style.height = (naturalHeight * scale) + 'px';
-                } else {
-                    // 창 크기가 바뀔 때, zoomMode가 'fit'인 경우 항상 available 크기에 맞춰 scale을 계산
-                    fitScale = Math.min(availableWidth / naturalWidth, availableHeight / naturalHeight);
-                    var scale = zoomMode === 'fit' ? fitScale : manualZoom;
-                    lastScale = scale;
-                    
-                    slide.style.transform = 'scale(' + scale + ')';
-                    
-                    var scaledWidth = Math.round(naturalWidth * scale);
-                    var scaledHeight = Math.round(naturalHeight * scale);
-                    container.style.width = scaledWidth + 'px';
-                    container.style.height = scaledHeight + 'px';
-                }
-            });
-            
-            setZoomControlsEnabled(true);
-            updateZoomLabel(isMultiView ? 1 : lastScale);
-            setupSlideObserver();
-        }, 80);
+        setZoomControlsEnabled(true);
+        updateZoomLabel(scale);
+        setupSlideObserver();
       }
       function setManualZoom(nextZoom) {
         zoomMode = 'manual';
@@ -365,30 +353,44 @@
       }
       function zoomBy(delta) {
         var viewer = document.getElementById('viewer');
-        if (viewer.classList.contains('matrix-view')) {
-          var root = document.documentElement;
-          var currentWidth = parseInt(getComputedStyle(root).getPropertyValue('--matrix-cell-width') || '400', 10);
-          var newWidth = currentWidth * (1 + (delta * 2));
-          root.style.setProperty('--matrix-cell-width', Math.max(250, Math.min(1000, newWidth)) + 'px');
-          fitSlidesToWindow();
-        } else {
-          var base = zoomMode === 'fit' ? fitScale : manualZoom;
-          setManualZoom(base + delta);
-        }
+        if (!viewer || !getSlides().length) return;
+        var base = zoomMode === 'fit' ? fitScale : manualZoom;
+        setManualZoom(base + delta);
       }
       function resetFitZoom() {
         var viewer = document.getElementById('viewer');
-        if(viewer.classList.contains('matrix-view') || viewer.classList.contains('grid-2')) {
-          setViewMode('single');
-        }
-        document.documentElement.style.removeProperty('--matrix-cell-width');
+        if (!viewer || !getSlides().length) return;
         zoomMode = 'fit';
         fitSlidesToWindow();
       }
       function scheduleFitSlides() {
-        setTimeout(fitSlidesToWindow, 100);
-        setTimeout(fitSlidesToWindow, 500);
-        setTimeout(fitSlidesToWindow, 1200);
+        setTimeout(finalizeRenderedSlides, 100);
+        setTimeout(finalizeRenderedSlides, 500);
+        setTimeout(finalizeRenderedSlides, 1200);
+        setTimeout(finalizeRenderedSlides, 2500);
+      }
+      var renderObserver = null;
+      function finalizeRenderedSlides() {
+        var hasSlide = !!document.querySelector('#viewer .slide, #viewer .pptx-slide');
+        if (!hasSlide) return false;
+        normalizeSlideFrames();
+        document.getElementById('status').textContent = 'ready';
+        setCodeAvailable(true);
+        setZoomControlsEnabled(true);
+        setupMatrixViewControls();
+        fitSlidesToWindow();
+        return true;
+      }
+      function watchRenderedSlides() {
+        if (renderObserver) renderObserver.disconnect();
+        if (!('MutationObserver' in window)) return;
+        renderObserver = new MutationObserver(function () {
+          if (finalizeRenderedSlides()) {
+            renderObserver.disconnect();
+            renderObserver = null;
+          }
+        });
+        renderObserver.observe(document.getElementById('viewer'), { childList: true, subtree: true });
       }
       function renderHtml(reason) {
         document.getElementById('status').textContent = 'rendering';
@@ -398,6 +400,7 @@
         updateZoomLabel(1);
         document.getElementById('viewer').classList.add('html-rendered');
         document.getElementById('viewer').innerHTML = '<div class="loading">' + (reason || 'PPTX를 HTML로 렌더링하는 중입니다.') + '</div>';
+        watchRenderedSlides();
         
         if (window.JSZipUtils && fileCache) {
           window.JSZipUtils.getBinaryContent = function (url, callback) {
@@ -419,14 +422,7 @@
             incSlide: { width: 0, height: 0 }
           });
           setTimeout(function () {
-            var hasSlide = !!document.querySelector('#viewer .slide, #viewer .pptx-slide, #viewer section');
-            document.getElementById('status').textContent = hasSlide ? 'ready' : 'rendered';
-            setCodeAvailable(hasSlide);
-            setZoomControlsEnabled(hasSlide);
-            fitSlidesToWindow();
-            if (hasSlide) {
-                setupMatrixViewControls();
-            }
+            if (!finalizeRenderedSlides()) document.getElementById('status').textContent = 'rendering';
           }, 300);
           scheduleFitSlides();
         } catch (err) {
@@ -442,7 +438,7 @@
         var btn = document.getElementById('code-btn');
         if (!btn) return;
         btn.disabled = !enabled;
-        btn.style.display = enabled ? '' : 'none';
+        btn.style.display = 'none';
       }
 
       function refreshCodePanel() {
@@ -479,26 +475,74 @@
         slides.forEach(function(slide) { slideObserver.observe(slide); });
       }
 
+      function scrollToSlide(index) {
+        var slides = getSlides();
+        if (!slides.length) return;
+        var viewer = document.getElementById('viewer');
+        currentSlideIndex = Math.max(0, Math.min(slides.length - 1, index));
+        var target = slides[currentSlideIndex];
+        var viewerRect = viewer.getBoundingClientRect();
+        var targetRect = target.getBoundingClientRect();
+        var targetTop = targetRect.top - viewerRect.top + viewer.scrollTop - 18;
+        viewer.scrollTop = Math.max(0, targetTop);
+      }
+
       function navigateSlide(delta) {
         var slides = getSlides();
         if (!slides.length) return;
-        currentSlideIndex = Math.max(0, Math.min(slides.length - 1, currentSlideIndex + delta));
-        slides[currentSlideIndex].scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+        var viewer = document.getElementById('viewer');
+        if (!viewer.classList.contains('grid-2') && !viewer.classList.contains('matrix-view')) {
+          var currentTop = viewer.scrollTop + 18;
+          currentSlideIndex = slides.reduce(function (bestIndex, slide, index) {
+            var slideTop = slide.getBoundingClientRect().top - viewer.getBoundingClientRect().top + viewer.scrollTop;
+            var bestTop = slides[bestIndex].getBoundingClientRect().top - viewer.getBoundingClientRect().top + viewer.scrollTop;
+            return Math.abs(slideTop - currentTop) < Math.abs(bestTop - currentTop) ? index : bestIndex;
+          }, 0);
+        }
+        scrollToSlide(currentSlideIndex + delta);
       }
 
-      function setViewMode(mode) {
+      function setViewMode(mode, preferredIndex) {
         var viewer = document.getElementById('viewer');
         if (!viewer) return;
+        var slides = getSlides();
+        if (Number.isFinite(preferredIndex)) {
+          currentSlideIndex = Math.max(0, Math.min(slides.length - 1, preferredIndex));
+        } else if (slides.length) {
+          var viewerTop = viewer.getBoundingClientRect().top;
+          currentSlideIndex = slides.reduce(function (bestIndex, slide, index) {
+            var distance = Math.abs(slide.getBoundingClientRect().top - viewerTop - 18);
+            var bestDistance = Math.abs(slides[bestIndex].getBoundingClientRect().top - viewerTop - 18);
+            return distance < bestDistance ? index : bestIndex;
+          }, 0);
+        }
         viewer.classList.remove('grid-2', 'grid-3', 'matrix-view');
         if (mode === '2-page') viewer.classList.add('grid-2');
         if (mode === 'matrix') viewer.classList.add('matrix-view');
         zoomMode = 'fit';
+        manualZoom = 1;
         fitSlidesToWindow();
+      }
+
+      function handleMenuCommand(command) {
+        if (!command) return;
+        if (typeof command === 'string') {
+          command = { type: command };
+        }
+        if (command.type === 'pptx-view-mode' && (command.mode === 'single' || command.mode === '2-page' || command.mode === 'matrix')) {
+          setViewMode(command.mode);
+        } else if (command.type === 'pptx-zoom-in') {
+          zoomBy(0.1);
+        } else if (command.type === 'pptx-zoom-out') {
+          zoomBy(-0.1);
+        } else if (command.type === 'pptx-zoom-fit') {
+          resetFitZoom();
+        }
       }
 
       function setupMatrixViewControls() {
         var controls = document.getElementById('view-controls');
-        if (controls) controls.style.display = '';
+        if (controls && getSlides().length) controls.style.display = '';
         if (viewControlsBound) return;
         viewControlsBound = true;
         document.querySelectorAll('[data-view-mode]').forEach(function(btn) {
@@ -510,9 +554,9 @@
           var viewer = document.getElementById('viewer');
           if (!viewer.classList.contains('grid-2') && !viewer.classList.contains('matrix-view')) return;
           var slides = getSlides();
-          currentSlideIndex = Math.max(0, slides.indexOf(container));
-          setViewMode('single');
-          setTimeout(function() { navigateSlide(0); }, 120);
+          var clickedIndex = Math.max(0, slides.indexOf(container));
+          setViewMode('single', clickedIndex);
+          setTimeout(function() { scrollToSlide(clickedIndex); }, 120);
         });
       }
 
@@ -549,7 +593,16 @@
           return;
         }
         var key = event.key;
-        if (key === 'ArrowDown' || key === 'PageDown' || (key === ' ' && !event.shiftKey)) {
+        if (event.ctrlKey && !event.altKey && !event.metaKey && (key === '+' || key === '=')) {
+          event.preventDefault();
+          zoomBy(0.1);
+        } else if (event.ctrlKey && !event.altKey && !event.metaKey && key === '-') {
+          event.preventDefault();
+          zoomBy(-0.1);
+        } else if (event.ctrlKey && !event.altKey && !event.metaKey && key === '0') {
+          event.preventDefault();
+          resetFitZoom();
+        } else if (key === 'ArrowDown' || key === 'PageDown' || (key === ' ' && !event.shiftKey)) {
           event.preventDefault();
           navigateSlide(1);
         } else if (key === 'ArrowUp' || key === 'PageUp' || (key === ' ' && event.shiftKey)) {
@@ -570,6 +623,10 @@
           }
         });
       }
+      if (window.web2electron && typeof window.web2electron.onMenuCommand === 'function') {
+        window.web2electron.onMenuCommand(handleMenuCommand);
+      }
+      setupMatrixViewControls();
       if (!fileUrl) {
         showError('파일 경로가 없습니다.');
         return;
